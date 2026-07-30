@@ -13,7 +13,21 @@ Endpoints:
     POST /process   - upload a scans PDF + answer key, get back a ZIP
                        of every output file (results.xlsx,
                        student_reports.pdf, bubble_overlay.pdf,
-                       manual_review.xlsx + its roll-grid crop images)
+                       manual_review.xlsx + its roll-grid crop images).
+                       summary.json inside that ZIP includes a
+                       "pending_review" list (filename, detected_roll,
+                       reason, image_filename) for any sheet whose
+                       roll number needs a person to confirm it.
+    POST /resolve   - finish sheets flagged above once a person has
+                       figured out the correct roll number: upload the
+                       job's results.xlsx plus a "corrections" JSON
+                       object ({filename: roll_number, ...}), get back
+                       a ZIP with the updated results.xlsx and rebuilt
+                       student_reports.pdf. No re-scanning - it
+                       rescores against the answers already saved in
+                       results.xlsx. Callers that still don't have a
+                       real roll number for a sheet just omit it from
+                       corrections and can call this again later.
 
 Each request gets its own temporary working directory, so concurrent
 requests from different callers never share or overwrite each other's
@@ -41,11 +55,11 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.background import BackgroundTask
 
-from omr.pipeline import run_batch, load_config_and_layout
+from omr.pipeline import run_batch, load_config_and_layout, resolve_manual_review
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_ROOT / "config.json"
@@ -56,6 +70,17 @@ app = FastAPI(title="OMR Checker API")
 # Loaded once at startup - config.json/layout.json describe the fixed
 # sheet template, not anything that changes per request.
 _config, _layout = load_config_and_layout(str(CONFIG_PATH), str(LAYOUT_PATH))
+
+# config.json's student_photo_dir is a relative path meant for the CLI
+# (run from the project root by hand). A web service's working
+# directory depends on how it's launched (systemd WorkingDirectory,
+# whoever's shell started uvicorn, etc.) - resolving it relative to
+# CWD is fragile and silently breaks if that ever changes. Anchor it
+# to the project root instead, and create it up front so a permissions
+# problem surfaces clearly at startup rather than mid-request.
+if not os.path.isabs(_config.get("student_photo_dir", "")):
+    _config["student_photo_dir"] = str(PROJECT_ROOT / _config.get("student_photo_dir", "output/student_photos"))
+os.makedirs(_config["student_photo_dir"], exist_ok=True)
 
 
 @app.get("/health")
@@ -87,6 +112,7 @@ def _zip_outputs(work_dir: Path, result: dict) -> io.BytesIO:
                 "num_processed": result["num_processed"],
                 "num_resolved": result["num_resolved"],
                 "num_pending_review": result["num_pending_review"],
+                "pending_review": result.get("pending_entries", []),
                 "warnings": result["warnings"],
             }, indent=2),
         )
@@ -141,6 +167,66 @@ async def process(
         zip_buf,
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=omr_results.zip"},
+        background=cleanup,
+    )
+
+
+@app.post("/resolve")
+async def resolve(
+    results_xlsx: UploadFile = File(..., description="The job's results.xlsx from a previous /process call"),
+    corrections: str = Form(..., description='JSON object: {"filename": "corrected_roll_number", ...}'),
+):
+    if not results_xlsx.filename.lower().endswith(".xlsx"):
+        raise HTTPException(400, "results_xlsx must be an .xlsx file")
+
+    try:
+        corrections_dict = json.loads(corrections)
+        if not isinstance(corrections_dict, dict):
+            raise ValueError("must be a JSON object of {filename: roll_number}")
+    except (json.JSONDecodeError, ValueError) as e:
+        raise HTTPException(400, f"Invalid 'corrections' field: {e}")
+
+    work_dir = Path(tempfile.mkdtemp(prefix="omr_resolve_"))
+    try:
+        results_path = work_dir / "results.xlsx"
+        _save_upload(results_xlsx, results_path)
+
+        result = resolve_manual_review(
+            results_path=str(results_path),
+            corrections=corrections_dict,
+            config=_config,
+            reports_pdf_path=str(work_dir / "student_reports.pdf"),
+        )
+    except KeyError as e:
+        # Most likely cause: results_xlsx isn't actually one of our
+        # reports (missing an expected sheet/column) - a 400, not a 500.
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise HTTPException(400, f"results_xlsx doesn't look like a valid OMR results file (missing {e}).")
+    except Exception as e:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise HTTPException(500, f"Resolve failed: {e}")
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(results_path, arcname="results.xlsx")
+        if result["reports_pdf_path"] and os.path.exists(result["reports_pdf_path"]):
+            zf.write(result["reports_pdf_path"], arcname="student_reports.pdf")
+        zf.writestr(
+            "resolve_summary.json",
+            json.dumps({
+                "resolved": result["resolved"],
+                "still_invalid": result["still_invalid"],
+                "num_resolved": result["num_resolved"],
+                "num_still_pending": result["num_still_pending"],
+            }, indent=2),
+        )
+    zip_buf.seek(0)
+
+    cleanup = BackgroundTask(shutil.rmtree, work_dir, ignore_errors=True)
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=omr_resolve_result.zip"},
         background=cleanup,
     )
 

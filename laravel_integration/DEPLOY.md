@@ -107,7 +107,36 @@ php artisan config:clear   # picks up the new OMR_API_URL from .env
 
 Visit `/omr` (or whatever URL prefix you used in the route group) while
 logged in, upload a scans PDF + answer key, and confirm you get a
-results page with download links.
+results page with download links. If any sheets need a roll number
+confirmed, you'll also see a review table right on that page - type
+in the correct roll number for each and submit, no separate file to
+download/edit/re-upload.
+
+## 6b. Raise nginx's and PHP's upload size limits
+
+By default nginx caps uploads at 1MB and will reject a scans PDF with
+`413 Request Entity Too Large` before it ever reaches Laravel. Fix it
+in your site's nginx config (`/etc/nginx/sites-available/your-site`),
+inside the `server { }` block:
+
+```nginx
+client_max_body_size 60M;   # above the 50MB scans_pdf limit in OmrController.php
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Then also raise PHP's own limits (`post_max_size` must be larger than
+`upload_max_filesize`) - find the active file with `php --ini`, set
+both to at least `60M`, and restart php-fpm:
+
+```bash
+sudo systemctl restart php8.3-fpm   # match your actual PHP version
+```
+
+This step is independent of `api.py` - that service is only ever
+called by Laravel over localhost, never through nginx.
 
 ## 7. After a deploy/update
 
@@ -126,9 +155,11 @@ sudo systemctl restart omr-checker
 - [ ] No firewall rule/reverse-proxy exposes port 8001 externally.
 - [ ] The `/omr` routes in Laravel sit behind your existing `auth`
       middleware (already the case in `routes_snippet.php`).
-- [ ] `storage/app/private/omr_jobs/` (created automatically per job)
-      holds student names/roll numbers/photos - it inherits Laravel's
-      normal storage permissions, so nothing web-servable directly
-      exposes it. Consider a periodic cleanup job (e.g. a scheduled
-      `find storage/app/private/omr_jobs -mtime +30 -delete`) if you
-      don't want old batches kept indefinitely.
+- [ ] `omr_jobs/` on Laravel's `local` disk (created automatically per
+      job - actual path on disk depends on your Laravel version, see
+      `OmrController.php`'s header comment) holds student names/roll
+      numbers/photos. It's never web-servable, unlike the `public`
+      disk. Consider a periodic cleanup job if you don't want old
+      batches kept indefinitely, e.g.:
+      `find "$(php artisan tinker --execute='echo storage_path(\"app\");')" -path '*/omr_jobs/*' -mtime +30 -delete`
+      (or simpler: just `find storage/app -path '*/omr_jobs/*' -mtime +30 -delete` run from your Laravel app's root).
