@@ -1,0 +1,290 @@
+
+/* ==================================================================
+   OMR Answer Sheet - print stylesheet
+   A4, 300-DPI-optimized, black & white, all measurements in mm.
+   ================================================================== */
+
+:root {
+  --page-w: 210mm;
+  --page-h: 297mm;
+  --page-margin: 3mm;
+
+  --ink: #000;
+  --line: #000;
+  --muted: #555;
+
+  --marker-size: 6mm;   /* primary corner registration squares */
+  --frame-gap: 2mm;
+  --tick-w: 1mm;
+  --tick-h: 3mm;
+
+  --bubble-d: 3.5mm;         /* answer bubble diameter (spec: 5-6mm) */
+  --bubble-border: 0.35mm;
+  --roll-bubble-d: 3.5mm;
+
+  /* explicit, pre-computed section heights (see GEOMETRY block in the
+     generator script) - the whole vertical stack is fixed-height by
+     design so the sheet is guaranteed to fit exactly one A4 page */
+  --header-h: 17mm;
+  --titlebar-h: 5mm;
+  --section-gap: 0.6mm;
+  --roll-title-h: 3.5mm;
+  --roll-digitbox-h: 7mm;
+  --roll-digitbox-margin: 1mm;
+  --rb-row-h: 5.15mm;
+  --qgrid-h: 168mm;
+  --qgrid-header-h: 4mm;
+  --q-row-h: 6.488mm;
+  --bottom-h: 17mm;
+  --roll-grid-w: 74mm;
+  --info-roll-h: 65.6mm;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "DejaVu Sans", Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 0; /* we manage all spacing ourselves via .sheet, for exact mm control */
+}
+
+/* Prevents any accidental second page: everything must fit inside .sheet */
+.sheet {
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  padding: var(--page-margin);
+  overflow: hidden;
+  page-break-after: avoid;
+  page-break-inside: avoid;
+}
+
+/* ---------------- Primary registration markers ---------------- */
+.marker {
+  position: absolute;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  background: var(--ink);
+}
+.marker-tl { top: var(--page-margin); left: var(--page-margin); }
+.marker-tr { top: var(--page-margin); right: var(--page-margin); }
+.marker-bl { bottom: var(--page-margin); left: var(--page-margin); }
+.marker-br { bottom: var(--page-margin); right: var(--page-margin); }
+
+/* ---------------- Secondary alignment ticks ---------------- */
+.ticks {
+  position: absolute;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.ticks-top, .ticks-bottom {
+  left: calc(var(--page-margin) + var(--marker-size) + 2mm);
+  right: calc(var(--page-margin) + var(--marker-size) + 2mm);
+  height: var(--tick-h);
+}
+.ticks-top { top: var(--page-margin); }
+.ticks-bottom { bottom: var(--page-margin); }
+.tick { width: var(--tick-w); height: var(--tick-h); background: var(--ink); }
+
+.ticks-left, .ticks-right {
+  top: calc(var(--page-margin) + var(--marker-size) + 2mm);
+  bottom: calc(var(--page-margin) + var(--marker-size) + 2mm);
+  width: var(--tick-h);
+  flex-direction: column;
+}
+.ticks-left { left: var(--page-margin); }
+.ticks-right { right: var(--page-margin); }
+.tick-v { width: var(--tick-h); height: var(--tick-w); background: var(--ink); }
+
+/* ---------------- Content wrapper (inside the marker frame) ---------------- */
+.content {
+  position: absolute;
+  top: calc(var(--page-margin) + var(--marker-size) + var(--frame-gap));
+  left: calc(var(--page-margin) + var(--marker-size) + var(--frame-gap));
+  right: calc(var(--page-margin) + var(--marker-size) + var(--frame-gap));
+  bottom: calc(var(--page-margin) + var(--marker-size) + var(--frame-gap));
+  display: flex;
+  flex-direction: column;
+}
+.content > * + * { margin-top: var(--section-gap); }
+
+/* ---------------- Header ---------------- */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 6mm;
+  height: var(--header-h);
+  flex: 0 0 auto;
+}
+.logo-box {
+  width: var(--header-h);
+  height: var(--header-h);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.school-info { flex: 1; text-align: left; }
+.school-name {
+  font-family: "Georgia", "DejaVu Serif", serif;
+  font-size: 14.5pt;
+  font-weight: bold;
+  letter-spacing: 0.3mm;
+  line-height: 1.15;
+}
+.school-address {
+  font-size: 7.6pt;
+  font-weight: bold;
+  margin-top: 0.5mm;
+  line-height: 1.15;
+}
+.school-recognition {
+  font-size: 7pt;
+  margin-top: 0.4mm;
+  line-height: 1.15;
+}
+.school-contact {
+  font-size: 7pt;
+  margin-top: 0.4mm;
+  line-height: 1.15;
+}
+
+.title-bar {
+  height: var(--titlebar-h);
+  flex: 0 0 auto;
+  border-top: 0.5mm solid var(--ink);
+  border-bottom: 0.5mm solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10pt;
+  font-weight: bold;
+  letter-spacing: 0.8mm;
+}
+
+/* ---------------- Candidate info + Roll grid band ---------------- */
+.info-roll-band {
+  display: flex;
+  align-items: stretch;
+  gap: 3mm;
+  height: var(--info-roll-h);
+  flex: 0 0 auto;
+}
+.candidate-info {
+  flex: 1;              /* takes all width the fixed-width roll-grid doesn't need */
+  border: 0.3mm solid var(--ink);
+  padding: 1.5mm 2.5mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+.ci-row { display: flex; gap: 3mm; }
+.ci-field { flex: 1; display: flex; align-items: flex-end; gap: 1.5mm; }
+.ci-label { font-size: 7.3pt; white-space: nowrap; }
+.ci-line { flex: 1; border-bottom: 0.25mm solid var(--ink); height: 3.6mm; }
+.ci-line.short { flex: 0 0 22mm; }
+
+.roll-grid {
+  flex: 0 0 var(--roll-grid-w);  /* fixed, compact width - right-anchored, not proportional */
+  border: 0.3mm solid var(--ink);
+  padding: 1mm 2mm;
+  display: flex;
+  flex-direction: column;
+}
+.roll-title { height: var(--roll-title-h); font-size: 7.5pt; font-weight: bold; text-align: center; }
+.roll-digit-boxes {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.6mm;
+  height: var(--roll-digitbox-h);
+  margin-bottom: var(--roll-digitbox-margin);
+}
+.roll-digit-box {
+  height: 100%;
+  border: 0.25mm solid var(--ink);
+}
+.roll-bubble-grid { display: flex; flex-direction: column; }
+.rb-row { display: grid; grid-template-columns: 3mm repeat(6, 1fr); align-items: center; height: var(--rb-row-h); }
+.rb-cell { display: flex; align-items: center; justify-content: center; }
+.rb-rowlabel { font-size: 6.5pt; font-weight: bold; }
+.rb-cell .bubble { width: var(--roll-bubble-d); height: var(--roll-bubble-d); font-size: 0; }
+
+/* ---------------- Bubbles (shared) - option letter is centered INSIDE ---------------- */
+/* NOTE: must be `flex`, not `inline-flex` - WeasyPrint (and some other
+   engines) double-paint the border on inline-flex + border-radius:50%
+   elements (renders as a faint ghosted second circle offset up-left).
+   `.bubble` is always the sole child of an already-centering flex
+   parent (.opt / .rb-cell), so it never needed to be inline. */
+.bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--bubble-d);
+  height: var(--bubble-d);
+  border: var(--bubble-border) solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+  font-size: 6.5pt;
+  color: #666;
+  line-height: 1;
+}
+
+/* ---------------- Question grid ---------------- */
+.question-grid {
+  display: flex;
+  gap: 2.5mm;
+  height: var(--qgrid-h);
+  flex: 0 0 auto;
+  border-top: 0.3mm solid var(--ink);
+  padding-top: 1.5mm;
+}
+.q-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-left: 0.2mm solid #bbb;
+  padding-left: 2mm;
+}
+.q-col:first-child { border-left: none; padding-left: 0; }
+.q-row {
+  height: var(--q-row-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.q-headrow { height: var(--qgrid-header-h); border-bottom: 0.25mm solid var(--ink); margin-bottom: 0.6mm; font-weight: bold; }
+.q-num { width: 7mm; font-size: 8pt; font-weight: bold; flex-shrink: 0; }
+.qh-opt { flex: 1; text-align: center; font-size: 8pt; }
+.opt { flex: 1; display: flex; align-items: center; justify-content: center; }
+
+.section-title { font-size: 7pt; font-weight: bold; margin-bottom: 0.5mm; }
+
+/* ---------------- Declaration + Invigilator ---------------- */
+.bottom-band {
+  display: flex;
+  gap: 4mm;
+  height: var(--bottom-h);
+  flex: 0 0 auto;
+  border-top: 0.3mm solid var(--ink);
+  padding-top: 1mm;
+  overflow: hidden;
+}
+.declaration { flex: 1.5; font-size: 6.8pt; line-height: 1.2; }
+.declaration p { margin: 0 0 0.8mm 0; }
+.sig-row { display: flex; align-items: flex-end; gap: 2mm; margin-top: 1mm; }
+.invigilator { flex: 1; font-size: 6.8pt; line-height: 1.2; }
+.inv-row { display: flex; align-items: flex-end; gap: 1.2mm; margin-top: 0.6mm; }
+.attendance { align-items: center; }
+.checkbox {
+  display: inline-block;
+  width: 3mm;
+  height: 3mm;
+  border: 0.25mm solid var(--ink);
+}

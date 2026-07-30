@@ -1,0 +1,22 @@
+1) Add to config/services.php, inside the returned array:
+
+    'omr' => [
+        'url' => env('OMR_API_URL', 'http://127.0.0.1:8001'),
+    ],
+
+2) Add to .env (and .env.example):
+
+    OMR_API_URL=http://127.0.0.1:8001
+
+3) Make sure storage/app/private exists and is writable by the web
+   server user (php-fpm/www-data etc). Laravel 11+ creates it
+   automatically; on older Laravel versions run:
+
+    mkdir -p storage/app/private
+    chown -R www-data:www-data storage/app/private   # adjust user to your setup
+
+4) File upload size limits: Laravel's own validation caps uploads at
+   51200 KB (scans_pdf) / 5120 KB (answer_key) in OmrController.php -
+   raise those `max:` values there if your batches are bigger. Also
+   check php.ini's `upload_max_filesize` and `post_max_size` are at
+   least that large, and restart php-fpm after changing them.

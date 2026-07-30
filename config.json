@@ -1,0 +1,38 @@
+{
+  "sheet_title": "Divine Light Central School - OMR Answer Sheet (100Q)",
+  "sheet_pdf": "html_answer_sheet/omr_sheet.pdf",
+
+  "school_name": "DIVINE LIGHT CENTRAL SCHOOL",
+  "school_address": "SHIVPURI, RAMCHANDRAPUR, BIHARSHARIF (NALANDA)",
+  "school_recognition": "Recognized by Government of Bihar under R.T.E. 2009",
+  "school_contact": "Web: divinelightcentralschool.com  |  Ph No: 8340220267",
+  "school_logo": "html_answer_sheet/school_logo.png",
+
+  "num_questions": 100,
+  "options": ["A", "B", "C", "D"],
+  "num_blocks": 4,
+  "rows_per_block": 25,
+
+  "roll_digits": 6,
+  "roll_values": 10,
+
+  "canonical_width": 1654,
+  "canonical_height": 2339,
+  "render_dpi": 200,
+  "scan_pdf_dpi": 200,
+
+  "fill_threshold": 0.42,
+  "ambiguous_margin": 0.12,
+
+  "marking_scheme": {
+    "correct": 1.0,
+    "wrong": -0.25,
+    "unattempted": 0.0
+  },
+
+  "roll_number_source": "bubbles",
+  "student_info_api_base": "https://dlcs.managemyschools.in/api/student/info",
+  "student_image_api_base": "https://dlcs.managemyschools.in/upload/student_images",
+  "pending_review_dir": "output/pending_review",
+  "student_photo_dir": "output/student_photos"
+}
