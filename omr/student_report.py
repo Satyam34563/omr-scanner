@@ -292,12 +292,15 @@ def build_combined_report(student_results, config, out_path):
     into one file at `out_path`. Sheets still pending manual roll
     review are skipped - see tools/resolve_manual_roll.py, which
     rebuilds this same combined file once they're resolved. Returns
-    (out_path, skipped_filenames); out_path is None if nothing was
-    resolved yet."""
+    (out_path, skipped_filenames, manifest); out_path is None if
+    nothing was resolved yet, and manifest is a list of
+    {"roll_no": ..., "page": ...} (1-indexed) in the same order the
+    pages were written, so a caller can know which page belongs to
+    which student without re-deriving this same sort itself."""
     resolved = [r for r in student_results if r["roll_no"] is not None]
     skipped = [r["filename"] for r in student_results if r["roll_no"] is None]
     if not resolved:
-        return None, skipped
+        return None, skipped, []
 
     resolved.sort(key=_roll_sort_key)
 
@@ -312,4 +315,8 @@ def build_combined_report(student_results, config, out_path):
     with open(out_path, "wb") as f:
         writer.write(f)
     writer.close()
-    return out_path, skipped
+
+    manifest = [
+        {"roll_no": r["roll_no"], "page": i + 1} for i, r in enumerate(resolved)
+    ]
+    return out_path, skipped, manifest

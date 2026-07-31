@@ -92,6 +92,7 @@ def run_batch(
         {
             "output_path": str,
             "reports_pdf_path": str or None,   # None if nothing was resolved yet
+            "reports_pdf_manifest": [{"roll_no": str, "page": int}, ...],  # 1-indexed page order
             "overlay_pdf_path": str or None,
             "manual_review_path": str or None, # None if nothing needs review
             "num_processed": int,
@@ -228,13 +229,14 @@ def run_batch(
     question_stats = aggregate_question_stats(all_per_question, answer_key)
     build_report(output_path, student_results, question_stats, warnings)
 
-    combined_path, skipped = build_combined_report(student_results, config, reports_pdf_path)
+    combined_path, skipped, reports_pdf_manifest = build_combined_report(student_results, config, reports_pdf_path)
     overlay_path = build_overlay_pdf(overlay_pages, layout, overlay_pdf_path)
     manual_review_path_out = build_manual_review_workbook(pending_entries, manual_review_path)
 
     return {
         "output_path": output_path,
         "reports_pdf_path": combined_path,
+        "reports_pdf_manifest": reports_pdf_manifest,
         "overlay_pdf_path": overlay_path,
         "manual_review_path": manual_review_path_out,
         "num_processed": len(student_results),
@@ -424,6 +426,7 @@ def resolve_manual_review(results_path, corrections, config, reports_pdf_path):
             "resolved": [{"filename":, "roll_no":, "name":}, ...],
             "still_invalid": [{"filename":, "entered_roll":, "reason":}, ...],
             "reports_pdf_path": str or None,
+            "reports_pdf_manifest": [{"roll_no": str, "page": int}, ...],  # 1-indexed page order
             "num_resolved": int,
             "num_still_pending": int,  # rows STILL "PENDING REVIEW" after this call
         }
@@ -508,12 +511,13 @@ def resolve_manual_review(results_path, corrections, config, reports_pdf_path):
             "per_question": per_question, "needs_review": False, "student_info": student_info,
         })
 
-    combined_path, _ = build_combined_report(all_results, config, reports_pdf_path)
+    combined_path, _, reports_pdf_manifest = build_combined_report(all_results, config, reports_pdf_path)
 
     return {
         "resolved": resolved,
         "still_invalid": still_invalid,
         "reports_pdf_path": combined_path,
+        "reports_pdf_manifest": reports_pdf_manifest,
         "num_resolved": len(resolved),
         "num_still_pending": num_still_pending,
     }

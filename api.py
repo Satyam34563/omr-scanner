@@ -106,6 +106,14 @@ def _zip_outputs(work_dir: Path, result: dict) -> io.BytesIO:
         if pending_dir.exists():
             for img_path in pending_dir.iterdir():
                 zf.write(img_path, arcname=f"pending_review/{img_path.name}")
+        # Lets a caller know which page of student_reports.pdf belongs to which
+        # roll number without re-deriving the same sort order itself - only
+        # meaningful (and only ever non-empty) when that PDF was actually built.
+        if result.get("reports_pdf_path"):
+            zf.writestr(
+                "student_reports_manifest.json",
+                json.dumps(result.get("reports_pdf_manifest", []), indent=2),
+            )
         zf.writestr(
             "summary.json",
             json.dumps({
@@ -211,6 +219,10 @@ async def resolve(
         zf.write(results_path, arcname="results.xlsx")
         if result["reports_pdf_path"] and os.path.exists(result["reports_pdf_path"]):
             zf.write(result["reports_pdf_path"], arcname="student_reports.pdf")
+            zf.writestr(
+                "student_reports_manifest.json",
+                json.dumps(result.get("reports_pdf_manifest", []), indent=2),
+            )
         zf.writestr(
             "resolve_summary.json",
             json.dumps({
