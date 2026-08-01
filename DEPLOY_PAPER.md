@@ -40,7 +40,15 @@ This installs Node, weasyprint's system libs, Devanagari fonts, `npm install` in
 ```bash
 cd /path/to/sms
 git pull                      # master now includes the /paper feature
-composer install --no-dev -o
+
+# storage/bootstrap must be writable by BOTH the artisan user and the web user
+sudo chown -R "$USER":www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+
+# NOTE: do NOT use --no-dev here. This app registers barryvdh/laravel-debugbar
+# (a require-dev package) at boot, so --no-dev removes it and package:discover
+# then fails with "Class Barryvdh\Debugbar\ServiceProvider not found".
+composer install -o
 php artisan config:clear
 php artisan db:command        # runs pending tenant migrations (incl. paper_presets)
                               # for every tenant except `admin`; wraps in down/up.
