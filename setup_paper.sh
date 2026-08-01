@@ -14,9 +14,14 @@ fi
 node --version
 
 echo "==> [2/4] weasyprint system libs + Devanagari fonts (for the metadata PDF)"
-sudo apt-get install -y \
-  libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev \
-  fonts-noto fonts-noto-devanagari
+# Core libs weasyprint needs at runtime (Pango does the text shaping).
+sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libffi-dev
+# Fonts: Latin + Devanagari. Package names vary across Ubuntu releases, so try a
+# few and skip any that aren't available (fonts-noto-core carries Noto Sans +
+# Noto Sans Devanagari; fonts-deva is the Devanagari metapackage).
+for pkg in fonts-noto-core fonts-deva fonts-indic; do
+  sudo apt-get install -y "$pkg" || echo "   (skipped $pkg — not in this release's repos)"
+done
 
 echo "==> [3/4] Node deps for the docx builder"
 ( cd paper_docx && npm install --omit=dev )
