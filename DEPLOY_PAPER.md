@@ -42,7 +42,8 @@ cd /path/to/sms
 git pull                      # master now includes the /paper feature
 composer install --no-dev -o
 php artisan config:clear
-php artisan tenants:artisan "migrate"   # creates paper_presets in every tenant DB
+php artisan db:command        # runs pending tenant migrations (incl. paper_presets)
+                              # for every tenant except `admin`; wraps in down/up.
 ```
 
 ### 4. Copy the question bank to the server
