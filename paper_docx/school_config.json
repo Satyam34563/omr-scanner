@@ -1,0 +1,28 @@
+{
+  "school": "Divine Light Central School",
+  "logo": "logo.png",
+  "displayFont": "Cambria",
+  "session": "2026-27",
+  "addressLines": [
+    "SHIVPURI, RAMCHANDRAPUR, BIHARSHARIF (NALANDA)",
+    "Recognized by Government of Bihar under R.T.E. 2009",
+    "Reg. Code : 22913862022930162008",
+    "Web: divinelightcentralschool.com, Ph No: 8340220267"
+  ],
+  "defaultInstructions": [
+    "Read all the questions carefully before answering. The marks allotted to each question are indicated against it.",
+    "Attempt the questions as instructed and write your answers clearly in the answer booklet provided.",
+    "Ensure that you have attempted all required questions and submit your answer booklet to the invigilator before leaving the examination hall."
+  ],
+  "extraInstructions": [
+    "Fill the OMR answer sheet carefully. Use only a blue or black ballpoint pen, and ensure that you darken the correct circles neatly without making any stray marks."
+  ],
+  "defaultInstructionsHindi": [
+    "उत्तर देने से पहले सभी प्रश्नों को ध्यानपूर्वक पढ़ें। प्रत्येक प्रश्न के सामने आवंटित अंक दर्शाए गए हैं।",
+    "निर्देशानुसार प्रश्नों को हल करें और अपने उत्तर उत्तर-पुस्तिका में स्पष्ट रूप से लिखें।",
+    "सुनिश्चित करें कि आपने सभी आवश्यक प्रश्न हल कर लिए हैं और परीक्षा हॉल छोड़ने से पहले अपनी उत्तर-पुस्तिका निरीक्षक को जमा करें।"
+  ],
+  "extraInstructionsHindi": [
+    "ओ.एम.आर. उत्तर पत्रक को सावधानीपूर्वक भरें। केवल नीले या काले बॉल पेन का प्रयोग करें और सही गोले को बिना किसी अतिरिक्त निशान के स्पष्ट रूप से भरें।"
+  ]
+}

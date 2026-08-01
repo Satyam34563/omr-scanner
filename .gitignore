@@ -13,6 +13,12 @@ venv/
 output/
 input/
 
+# Node (paper docx builder) — install with `npm install` in paper_docx/
+paper_docx/node_modules/
+paper_docx/sample_output/
+paper_docx/*.bak_*
+paper_docx/generated_papers/
+
 # Editors
 .vscode/
 .idea/

@@ -1,0 +1,17 @@
+{
+  "paper_title": "हिन्दी अपठित गद्यांश अभ्यास प्रश्न-पत्र",
+  "output_name": "hindi_gadyansh_39",
+  "exam_duration": "2 Hours",
+  "exam_date": "29-07-2026",
+  "numbering": "continuous",
+  "selection_mode": "sequential",
+  "shortfall_strategy": "redistribute",
+  "sections": [
+    {
+      "section_name": "LANGUAGE TEST (HINDI BOOK)",
+      "mode": "passages",
+      "passage_ids": [93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131],
+      "questions_per_passage": null
+    }
+  ]
+}

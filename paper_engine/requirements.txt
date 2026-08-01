@@ -1,0 +1,7 @@
+# Question-paper engine — extra deps beyond the Python stdlib.
+# Selection/metadata use only the stdlib (sqlite3, json). These two are for the
+# export stage (cli/export.py): the OMR answer-key .xlsx and the metadata .pdf.
+# They are ALSO used by the OMR pipeline, so the shared omr_project venv already
+# satisfies them — install here only if you use a separate venv.
+openpyxl>=3.1
+weasyprint>=60

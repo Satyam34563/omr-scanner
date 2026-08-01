@@ -1,0 +1,26 @@
+{
+  "paper_title": "Jawahar Navodaya Vidyalaya Practice Set",
+  "output_name": "standard_preset",
+  "numbering": "continuous",
+  "selection_mode": "random",
+  "random_seed": 42,
+  "shortfall_strategy": "redistribute",
+  "sections": [
+    {
+      "section_name": "MENTAL ABILITY TEST",
+      "total_questions": 40,
+      "chapters": null
+    },
+    {
+      "section_name": "ARITHMETIC TEST",
+      "total_questions": 20,
+      "chapters": null
+    },
+    {
+      "section_name": "LANGUAGE TEST (ENGLISH)",
+      "mode": "passages",
+      "num_passages": 4,
+      "questions_per_passage": null
+    }
+  ]
+}

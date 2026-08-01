@@ -1,0 +1,28 @@
+{
+  "paper_title": "Jawahar Navodaya Vidyalaya Practice Set",
+  "output_name": "hindi_standard",
+  "exam_duration": "2 Hours",
+  "exam_date": "26-07-2026",
+  "numbering": "continuous",
+  "selection_mode": "sequential",
+  "random_seed": 42,
+  "shortfall_strategy": "redistribute",
+  "sections": [
+    {
+      "section_name": "MENTAL ABILITY TEST (HINDI BOOK)",
+      "total_questions": 40,
+      "chapters": null
+    },
+    {
+      "section_name": "ARITHMETIC TEST (HINDI BOOK)",
+      "total_questions": 20,
+      "chapters": null
+    },
+    {
+      "section_name": "LANGUAGE TEST (HINDI BOOK)",
+      "mode": "passages",
+      "num_passages": 4,
+      "questions_per_passage": null
+    }
+  ]
+}
