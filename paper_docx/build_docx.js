@@ -37,7 +37,7 @@ const { Jimp, JimpMime } = require("jimp");
 const {
   Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
   WidthType, BorderStyle, AlignmentType, VerticalAlign, SectionType, Footer, Header,
-  PageNumber, LevelFormat, LevelSuffix, ShadingType, LineRuleType,
+  PageNumber, LevelFormat, LevelSuffix, ShadingType, LineRuleType, Tab, TabStopType,
   HorizontalPositionAlign, HorizontalPositionRelativeFrom,
   VerticalPositionAlign, VerticalPositionRelativeFrom, TextWrappingType,
 } = require("docx");
@@ -1041,9 +1041,9 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   const tier = resolveReasoningTier(reasoningSec, q._chapter_name);
 
   // Marks + PYQ tag: kept together as ONE non-breaking unit (NB-spaces so it can
-  // never split across lines) and shown RIGHT-ALIGNED on their own line just
-  // below the stem. The "[N Marks]" part is optional per paper (_showQuestionMarks);
-  // the PYQ tag is only ever the year, in light gray, never the exam name.
+  // never split across lines). The "[N Marks]" part is optional per paper
+  // (_showQuestionMarks); the PYQ tag is only ever the year, in light gray,
+  // never the exam name. (Right-aligned onto the stem's last line just below.)
   const NB = "\u00a0";
   const metaRuns = [];
   if (_showQuestionMarks) {
@@ -1057,23 +1057,30 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   // Real numPr list marker ("1.") started at the exact display_number Stage 1
   // resolved (honors continuous/per_section numbering) \u2014 not a typed "Q1. "
   // text run, per the "Question numbering" formatting spec.
+  // Right tab stop near the column's right edge; the trailing runs start with a
+  // Tab so the marks jump there — on the SAME line as the stem, flush right,
+  // never on a line of their own. Positioned back by the indent so it can't
+  // overshoot the column (which would wrap the tag).
+  const stemTrailing = metaRuns.length ? [new TextRun({ children: [new Tab()] }), ...metaRuns] : [];
+  const rightTab = metaRuns.length
+    ? { tabStops: [{ type: TabStopType.RIGHT, position: availableWidth - QUESTION_INDENT }] }
+    : {};
+
   const qNumRef = registerQuestionNumbering(q.display_number);
   nodes.push(...textToParagraphs(
     q.question_text,
     { size: FONT_SIZE.question, font },
     // continuation paragraphs (e.g. after an inline image) align at the indent
-    { spacing: { after: metaRuns.length ? 20 : 40 }, indent: { left: QUESTION_INDENT } },
+    Object.assign({ spacing: { after: 40 }, indent: { left: QUESTION_INDENT } }, rightTab),
     {
       // the numbered line hangs the "1." back to the left margin, text at indent
       firstParaProps: {
         numbering: { reference: qNumRef, level: 0 },
         indent: { left: QUESTION_INDENT, hanging: QUESTION_INDENT },
       },
+      trailingRuns: stemTrailing,
     }
   ));
-  if (metaRuns.length) {
-    nodes.push(new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 40 }, children: metaRuns }));
-  }
 
   if (q.question_images && q.question_images.length > 0) {
     // Tiered cap (small/medium/large, by chapter) for reasoning questions;
