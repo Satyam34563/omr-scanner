@@ -99,6 +99,7 @@ def build_output(cfg, sections_out, warnings, image_base, renumber=True):
         "language": cfg["language"],
         "exam_duration": cfg["exam_duration"],
         "exam_date": cfg["exam_date"],
+        "show_question_marks": cfg.get("show_question_marks", True),
         "total_questions": total,
         "sections": sections_out,
         "context_blocks": blocks,

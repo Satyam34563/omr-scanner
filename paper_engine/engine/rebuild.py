@@ -49,6 +49,7 @@ def rebuild_from_content(qcon, old_content, image_base):
         "language": old_content.get("language"),
         "exam_duration": old_content.get("exam_duration", "2 Hours"),
         "exam_date": old_content.get("exam_date"),
+        "show_question_marks": old_content.get("show_question_marks", True),
         "numbering": "continuous",  # unused: renumber=False keeps original numbers
     }
     return output.build_output(cfg, sections_out, warnings, image_base, renumber=False)

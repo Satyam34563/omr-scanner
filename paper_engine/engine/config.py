@@ -145,5 +145,7 @@ def validate(cfg: dict) -> dict:
         "shortfall_strategy": shortfall,
         "total_questions": cfg.get("total_questions"),
         "exclude_ids": [int(x) for x in (cfg.get("exclude_ids") or [])],
+        # show the "[N Marks]" tag on each question (per-paper option, default on)
+        "show_question_marks": bool(cfg.get("show_question_marks", True)),
         "sections": norm_sections,
     }

@@ -152,6 +152,7 @@ function buildWatermarkHeader(font) {
 // matching whatever numbering mode (continuous/per_section) Stage 1 already
 // resolved into `display_number` and each option's array position.
 let _numberingConfig = null; // set per-document by the caller, mutated as blocks are built
+let _showQuestionMarks = true; // whether each question shows its "[N Marks]" tag (per-paper option)
 let _numRefCounter = 0;
 
 function nextNumRef(prefix) {
@@ -1035,38 +1036,44 @@ function optionsBlock(options, availableWidth, font, optRef, tier, indent = 0) {
 
 function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   const nodes = [];
-  const marksTxt = `  [${MARKS_PER_QUESTION} Marks]`;
-  // PYQ tag: only ever shown when is_pyq is true, shown as "PYQ \u2022 year" in
-  // light gray \u2014 still just the year, never the exam name.
-  const pyqTxt = q.is_pyq && q.pyq_year ? `  PYQ \u2022 ${q.pyq_year}` : "";
-
   // Smart Reasoning Image Size tier for this question's chapter (null for
   // non-reasoning sections, which keep the old generic image cap).
   const tier = resolveReasoningTier(reasoningSec, q._chapter_name);
+
+  // Marks + PYQ tag: kept together as ONE non-breaking unit (NB-spaces so it can
+  // never split across lines) and shown RIGHT-ALIGNED on their own line just
+  // below the stem. The "[N Marks]" part is optional per paper (_showQuestionMarks);
+  // the PYQ tag is only ever the year, in light gray, never the exam name.
+  const NB = "\u00a0";
+  const metaRuns = [];
+  if (_showQuestionMarks) {
+    metaRuns.push(new TextRun({ text: `[${MARKS_PER_QUESTION}${NB}Marks]`, italics: true, size: FONT_SIZE.small, font }));
+  }
+  if (q.is_pyq && q.pyq_year) {
+    const sep = metaRuns.length ? NB + NB : "";
+    metaRuns.push(new TextRun({ text: `${sep}PYQ${NB}\u2022${NB}${q.pyq_year}`, italics: true, size: FONT_SIZE.small, font, color: "808080" }));
+  }
 
   // Real numPr list marker ("1.") started at the exact display_number Stage 1
   // resolved (honors continuous/per_section numbering) \u2014 not a typed "Q1. "
   // text run, per the "Question numbering" formatting spec.
   const qNumRef = registerQuestionNumbering(q.display_number);
-  // Marks + PYQ tags trail the stem text; any inline {img:} in the stem becomes
-  // its own centered paragraph, so the stem is emitted as one-or-more paragraphs
-  // (the first carrying the list number). Newlines inside a text run stay <w:br/>.
-  const stemTrailing = [new TextRun({ text: marksTxt, italics: true, size: FONT_SIZE.small, font })];
-  if (pyqTxt) stemTrailing.push(new TextRun({ text: pyqTxt, italics: true, size: FONT_SIZE.small, font, color: "808080" }));
   nodes.push(...textToParagraphs(
     q.question_text,
     { size: FONT_SIZE.question, font },
     // continuation paragraphs (e.g. after an inline image) align at the indent
-    { spacing: { after: 40 }, indent: { left: QUESTION_INDENT } },
+    { spacing: { after: metaRuns.length ? 20 : 40 }, indent: { left: QUESTION_INDENT } },
     {
       // the numbered line hangs the "1." back to the left margin, text at indent
       firstParaProps: {
         numbering: { reference: qNumRef, level: 0 },
         indent: { left: QUESTION_INDENT, hanging: QUESTION_INDENT },
       },
-      trailingRuns: stemTrailing,
     }
   ));
+  if (metaRuns.length) {
+    nodes.push(new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 40 }, children: metaRuns }));
+  }
 
   if (q.question_images && q.question_images.length > 0) {
     // Tiered cap (small/medium/large, by chapter) for reasoning questions;
@@ -1203,6 +1210,8 @@ function collectBodyBlocks(data, font) {
 
 function buildQuestionPaperDoc(data, school) {
   const font = school.displayFont || "Georgia";
+  // Per-paper option: hide the "[N Marks]" tag on every question when false.
+  _showQuestionMarks = data.show_question_marks !== false;
 
   // Fresh numPr numbering-definition collector for this document — every
   // question number and option-letter list registered while building the
