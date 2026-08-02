@@ -849,6 +849,9 @@ function contextBlockParagraphs(block, font, isHindi, range) {
 
 const CHAR_WIDTH_TWIPS = 145; // heuristic avg glyph width at 10.5pt Cambria (conservative, avoids mid-word wraps)
 const OPTION_GAP_TWIPS = 300;
+// Hanging indent for a question: the number sits at the left margin and the
+// stem text, its wrapped lines, and the options all start at this indent.
+const QUESTION_INDENT = 360; // ~0.25"
 
 // Bounding box (px) an option image is scaled into for a given reasoning
 // tier — null tier (non-reasoning sections) keeps the old generic ~21.6mm cap.
@@ -951,7 +954,11 @@ function optionCellContent(opt, font, keepNext, optRef, tier) {
   })];
 }
 
-function optionsBlock(options, availableWidth, font, optRef, tier) {
+function optionsBlock(options, availableWidth, font, optRef, tier, indent = 0) {
+  // Shift the whole options grid right by `indent` to line up under the stem
+  // text; shrink the content width by the same amount so it stays in the column.
+  const tableIndent = indent ? { size: indent, type: WidthType.DXA } : undefined;
+  availableWidth = availableWidth - indent;
   const layout = chooseOptionLayout(options, availableWidth, tier);
 
   // A multi-row option table (2x2 / 4x1) must never split between rows —
@@ -970,7 +977,7 @@ function optionsBlock(options, availableWidth, font, optRef, tier) {
         children: optionCellContent(opt, font, false, optRef, tier),
       })),
     });
-    return new Table({ width: { size: availableWidth, type: WidthType.DXA }, columnWidths: options.map(() => colW), borders: NO_BORDERS, rows: [row] });
+    return new Table({ width: { size: availableWidth, type: WidthType.DXA }, indent: tableIndent, columnWidths: options.map(() => colW), borders: NO_BORDERS, rows: [row] });
   }
 
   if (layout === "4x1") {
@@ -982,7 +989,7 @@ function optionsBlock(options, availableWidth, font, optRef, tier) {
         children: optionCellContent(opt, font, i < options.length - 1, optRef, tier),
       })],
     }));
-    return new Table({ width: { size: availableWidth, type: WidthType.DXA }, columnWidths: [availableWidth], borders: NO_BORDERS, rows });
+    return new Table({ width: { size: availableWidth, type: WidthType.DXA }, indent: tableIndent, columnWidths: [availableWidth], borders: NO_BORDERS, rows });
   }
 
   // 2x2 — balanced, equal-width columns, equal gutter
@@ -1002,7 +1009,7 @@ function optionsBlock(options, availableWidth, font, optRef, tier) {
       ],
     }));
   }
-  return new Table({ width: { size: availableWidth, type: WidthType.DXA }, columnWidths: [half, half], borders: NO_BORDERS, rows });
+  return new Table({ width: { size: availableWidth, type: WidthType.DXA }, indent: tableIndent, columnWidths: [half, half], borders: NO_BORDERS, rows });
 }
 
 // ---------- one question's content (Parts 3, 5, 8) ----------
@@ -1043,8 +1050,16 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   nodes.push(...textToParagraphs(
     q.question_text,
     { size: FONT_SIZE.question, font },
-    { spacing: { after: 40 } },
-    { firstParaProps: { numbering: { reference: qNumRef, level: 0 } }, trailingRuns: stemTrailing }
+    // continuation paragraphs (e.g. after an inline image) align at the indent
+    { spacing: { after: 40 }, indent: { left: QUESTION_INDENT } },
+    {
+      // the numbered line hangs the "1." back to the left margin, text at indent
+      firstParaProps: {
+        numbering: { reference: qNumRef, level: 0 },
+        indent: { left: QUESTION_INDENT, hanging: QUESTION_INDENT },
+      },
+      trailingRuns: stemTrailing,
+    }
   ));
 
   if (q.question_images && q.question_images.length > 0) {
@@ -1063,7 +1078,7 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
 
   // Fresh option-letter list per question so it always restarts at "a)".
   const optRef = registerOptionNumbering();
-  nodes.push(optionsBlock(q.options, availableWidth, font, optRef, tier));
+  nodes.push(optionsBlock(q.options, availableWidth, font, optRef, tier, QUESTION_INDENT));
 
   // Wrap the whole question in an atomic single-cell table so it can never
   // split between column/page breaks. Tighter margins than before (reduces
