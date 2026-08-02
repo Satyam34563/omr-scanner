@@ -154,6 +154,7 @@ function buildWatermarkHeader(font) {
 let _numberingConfig = null; // set per-document by the caller, mutated as blocks are built
 let _showQuestionMarks = true; // whether each question shows its "[N Marks]" tag (per-paper option)
 let _forceMA1x4 = false; // force Mental Ability options into a single 1x4 row (per-paper option)
+let _paperLanguage = null; // paper language (drives the English Mental Ability figure rule)
 let _numRefCounter = 0;
 
 function nextNumRef(prefix) {
@@ -282,7 +283,8 @@ const FIGURE_WIDTH_OVERRIDE_MM = {
 };
 // Punched-hole chapter: 25mm ONLY when the figure is roughly square (1:1).
 const PUNCHED_HOLE_CHAPTER = "पंच नियंत्रित आकृति मोड़ना, खोलना";
-const SQUARE_RATIO = 1.3; // "approx 1:1" = aspect within ~30% either way
+const SQUARE_RATIO = 1.3;    // punched-hole "approx 1:1" = aspect within ~30% either way
+const EN_MA_SQUARE_RATIO = 1.2; // English Mental Ability lone-figure square tolerance (20%)
 
 // Native (source) pixel dimensions — used for aspect-ratio decisions.
 function nativeDims(filePath) {
@@ -1154,6 +1156,15 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
         if (aspect <= SQUARE_RATIO && aspect >= 1 / SQUARE_RATIO) targetWmm = 25;
       }
     }
+    // English Mental Ability: a question with a single ~square figure (1:1 ±20%)
+    // renders at 25mm wide.
+    if (_paperLanguage === "english" && reasoningSec && q.question_images.length === 1) {
+      const nd = nativeDims(q.question_images[0]);
+      if (nd && nd.height > 0) {
+        const aspect = nd.width / nd.height;
+        if (aspect <= EN_MA_SQUARE_RATIO && aspect >= 1 / EN_MA_SQUARE_RATIO) targetWmm = 25;
+      }
+    }
     const info = targetImageDims(q.question_images[0], "width", mm(targetWmm), mm(QFIG_MAX_H_MM), IMG_MAX_UPSCALE);
     const p = info
       ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 30 }, children: [new ImageRun({ data: info.buf, transformation: { width: info.width, height: info.height }, type: imageType(q.question_images[0]) })] })
@@ -1286,6 +1297,7 @@ function buildQuestionPaperDoc(data, school) {
   _showQuestionMarks = data.show_question_marks !== false;
   // Per-paper option: force Mental Ability questions into a single 1x4 option row.
   _forceMA1x4 = data.mental_ability_1x4 === true;
+  _paperLanguage = data.language || null;
 
   // Fresh numPr numbering-definition collector for this document — every
   // question number and option-letter list registered while building the
