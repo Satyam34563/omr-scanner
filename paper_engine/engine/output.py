@@ -62,8 +62,11 @@ def _dedupe_context_blocks(all_qs):
     return blocks
 
 
-def build_output(cfg, sections_out, warnings, image_base):
-    _assign_numbering(sections_out, cfg["numbering"])
+def build_output(cfg, sections_out, warnings, image_base, renumber=True):
+    # renumber=False keeps each question's existing display_number (used by the
+    # regenerate/rebuild path, which must reproduce the original numbering).
+    if renumber:
+        _assign_numbering(sections_out, cfg["numbering"])
     _resolve_images(sections_out, image_base)
 
     for sec in sections_out:
