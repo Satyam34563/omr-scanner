@@ -852,6 +852,9 @@ const OPTION_GAP_TWIPS = 300;
 // Hanging indent for a question: the number sits at the left margin and the
 // stem text, its wrapped lines, and the options all start at this indent.
 const QUESTION_INDENT = 360; // ~0.25"
+// Hanging indent WITHIN an option: the "a)"/"b)" marker hangs to the left and
+// the option text (incl. wrapped lines) aligns to the right of it.
+const OPTION_INDENT = 260; // ~0.18"
 
 // Bounding box (px) an option image is scaled into for a given reasoning
 // tier — null tier (non-reasoning sections) keeps the old generic ~21.6mm cap.
@@ -950,6 +953,9 @@ function optionCellContent(opt, font, keepNext, optRef, tier) {
     keepNext,
     keepLines: true,
     numbering,
+    // hanging indent: the a)/b) marker hangs back to the cell's left edge,
+    // wrapped option text lines up under the text (not under the marker).
+    indent: { left: OPTION_INDENT, hanging: OPTION_INDENT },
     children: textToNodes(opt.text || "", { size: FONT_SIZE.option, font }),
   })];
 }
