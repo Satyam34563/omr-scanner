@@ -1063,7 +1063,7 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   // overshoot the column (which would wrap the tag).
   const stemTrailing = metaRuns.length ? [new TextRun({ children: [new Tab()] }), ...metaRuns] : [];
   const rightTab = metaRuns.length
-    ? { tabStops: [{ type: TabStopType.RIGHT, position: availableWidth - QUESTION_INDENT }] }
+    ? { tabStops: [{ type: TabStopType.RIGHT, position: availableWidth }] }  // flush to the column's right edge
     : {};
 
   const qNumRef = registerQuestionNumbering(q.display_number);
