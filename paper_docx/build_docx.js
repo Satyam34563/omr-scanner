@@ -153,6 +153,7 @@ function buildWatermarkHeader(font) {
 // resolved into `display_number` and each option's array position.
 let _numberingConfig = null; // set per-document by the caller, mutated as blocks are built
 let _showQuestionMarks = true; // whether each question shows its "[N Marks]" tag (per-paper option)
+let _forceMA1x4 = false; // force Mental Ability options into a single 1x4 row (per-paper option)
 let _numRefCounter = 0;
 
 function nextNumRef(prefix) {
@@ -944,7 +945,8 @@ function estimateOptionHeight(opt, tier) {
   return 260; // ~one text line
 }
 
-function chooseOptionLayout(options, availableWidth, tier) {
+function chooseOptionLayout(options, availableWidth, tier, forceRow) {
+  if (forceRow && options.length === 4) return "1x4"; // experiment: mental-ability one-row
   if (options.length !== 4) return options.length > 2 ? "4x1" : "1x4";
 
   const widths = options.map((o) => estimateOptionWidth(o, tier));
@@ -1021,12 +1023,12 @@ function optionCellContent(opt, font, keepNext, optRef, tier) {
   })];
 }
 
-function optionsBlock(options, availableWidth, font, optRef, tier, indent = 0) {
+function optionsBlock(options, availableWidth, font, optRef, tier, indent = 0, forceRow = false) {
   // Shift the whole options grid right by `indent` to line up under the stem
   // text; shrink the content width by the same amount so it stays in the column.
   const tableIndent = indent ? { size: indent, type: WidthType.DXA } : undefined;
   availableWidth = availableWidth - indent;
-  const layout = chooseOptionLayout(options, availableWidth, tier);
+  const layout = chooseOptionLayout(options, availableWidth, tier, forceRow);
 
   // A multi-row option table (2x2 / 4x1) must never split between rows —
   // every row except the last is chained to the next via keepNext so Word
@@ -1161,7 +1163,7 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
 
   // Fresh option-letter list per question so it always restarts at "a)".
   const optRef = registerOptionNumbering();
-  nodes.push(optionsBlock(q.options, availableWidth, font, optRef, tier, QUESTION_INDENT));
+  nodes.push(optionsBlock(q.options, availableWidth, font, optRef, tier, QUESTION_INDENT, reasoningSec && _forceMA1x4));
 
   // Wrap the whole question in an atomic single-cell table so it can never
   // split between column/page breaks. Tighter margins than before (reduces
@@ -1282,6 +1284,8 @@ function buildQuestionPaperDoc(data, school) {
   const font = school.displayFont || "Georgia";
   // Per-paper option: hide the "[N Marks]" tag on every question when false.
   _showQuestionMarks = data.show_question_marks !== false;
+  // Per-paper option: force Mental Ability questions into a single 1x4 option row.
+  _forceMA1x4 = data.mental_ability_1x4 === true;
 
   // Fresh numPr numbering-definition collector for this document — every
   // question number and option-letter list registered while building the

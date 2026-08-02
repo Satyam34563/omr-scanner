@@ -147,5 +147,7 @@ def validate(cfg: dict) -> dict:
         "exclude_ids": [int(x) for x in (cfg.get("exclude_ids") or [])],
         # show the "[N Marks]" tag on each question (per-paper option, default on)
         "show_question_marks": bool(cfg.get("show_question_marks", True)),
+        # force Mental Ability options into a single 1x4 row (per-paper option)
+        "mental_ability_1x4": bool(cfg.get("mental_ability_1x4", False)),
         "sections": norm_sections,
     }
