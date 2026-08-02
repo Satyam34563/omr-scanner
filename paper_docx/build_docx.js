@@ -269,6 +269,31 @@ const OPT_TARGET_H_MM    = 18;  // every option image ~ this tall
 const INLINE_TARGET_H_MM = 6.5; // inline figure height (a bit taller than the text)
 const IMG_MAX_UPSCALE    = 3;   // never enlarge a low-res source beyond this factor
 
+// Per-chapter QUESTION-figure width override (mm) — these figure types read best
+// at a fixed 25mm width instead of the 40mm default. (Question figures only; the
+// inline-image sizing is unaffected.)
+const FIGURE_WIDTH_OVERRIDE_MM = {
+  "आकृति मिलान": 25,                                 // aakriti milaan / Figure Matching
+  "आकृति पूरक": 25,                                  // aakriti poorak / Figure Completion
+  "रेखागणितीय चित्र पूरक (त्रिभुज, वर्ग, वृत्त)": 25,  // rekhaganitiya chitra poorak
+  "आकृति निर्माण": 25,                                // aakriti nirmaan / Figure Construction
+  "सन्निहित आकृतियाँ": 25,                            // sannihit aakritiyan / Embedded Figures
+};
+// Punched-hole chapter: 25mm ONLY when the figure is roughly square (1:1).
+const PUNCHED_HOLE_CHAPTER = "पंच नियंत्रित आकृति मोड़ना, खोलना";
+const SQUARE_RATIO = 1.3; // "approx 1:1" = aspect within ~30% either way
+
+// Native (source) pixel dimensions — used for aspect-ratio decisions.
+function nativeDims(filePath) {
+  try {
+    const cached = _imageCache.get(filePath);
+    if (cached) return { width: cached.width, height: cached.height };
+    return sizeOf(fs.readFileSync(filePath));
+  } catch (e) {
+    return null;
+  }
+}
+
 // Scale to a target along `mode` ('width'|'height'); `guard` caps the OTHER
 // dimension (so a normalized image never overflows), `maxUpscale` limits blur.
 function targetImageDims(filePath, mode, target, guard, maxUpscale) {
@@ -1116,9 +1141,18 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
   if (q.question_images && q.question_images.length > 0) {
     // Normalize question figures by WIDTH so every one is the same width across
     // the paper (height follows aspect ratio, guarded so a tall one can't run
-    // away). Controlled upscale lifts low-res sources up to the target instead
-    // of leaving them tiny. Stays centered in the column.
-    const info = targetImageDims(q.question_images[0], "width", mm(QFIG_TARGET_W_MM), mm(QFIG_MAX_H_MM), IMG_MAX_UPSCALE);
+    // away). Controlled upscale lifts low-res sources up to the target. Some
+    // chapters override the width to 25mm; the punched-hole chapter only does so
+    // when its figure is roughly square. Stays centered in the column.
+    let targetWmm = FIGURE_WIDTH_OVERRIDE_MM[q._chapter_name] || QFIG_TARGET_W_MM;
+    if (q._chapter_name === PUNCHED_HOLE_CHAPTER) {
+      const nd = nativeDims(q.question_images[0]);
+      if (nd && nd.height > 0) {
+        const aspect = nd.width / nd.height;
+        if (aspect <= SQUARE_RATIO && aspect >= 1 / SQUARE_RATIO) targetWmm = 25;
+      }
+    }
+    const info = targetImageDims(q.question_images[0], "width", mm(targetWmm), mm(QFIG_MAX_H_MM), IMG_MAX_UPSCALE);
     const p = info
       ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 30 }, children: [new ImageRun({ data: info.buf, transformation: { width: info.width, height: info.height }, type: imageType(q.question_images[0]) })] })
       : new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `[image missing: ${path.basename(q.question_images[0])}]`, italics: true, bold: true, size: FONT_SIZE.small, font })] });
