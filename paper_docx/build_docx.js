@@ -208,6 +208,7 @@ const HINDI_SECTION_DISPLAY_NAMES = {
   "ARITHMETIC TEST (HINDI BOOK)": "अंकगणितीय परीक्षण",
   "ARITHMETIC TEST - EXTRA CHAPTERS (HINDI BOOK)": "अंकगणितीय परीक्षण (अतिरिक्त अध्याय)",
   "LANGUAGE TEST (HINDI BOOK)": "भाषा परीक्षण",
+  "ENVIRONMENTAL STUDIES (HINDI BOOK)": "पर्यावरण अध्ययन",
 };
 
 function displaySectionName(rawName) {
