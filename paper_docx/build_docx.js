@@ -256,6 +256,39 @@ function safeImageDims(filePath, maxWidthPx, maxHeightPx) {
   }
 }
 
+// ---- Consistent per-role image sizing (Part: "same size across the paper") ----
+// Instead of "fit in a box, never upscale" (which let each image's SOURCE pixel
+// count decide its size -> wildly inconsistent), we scale every image to a
+// TARGET along one axis, allowing controlled upscale. Per role:
+//   question figures -> normalize WIDTH  (tidy column, matching left/right edges)
+//   option images    -> normalize HEIGHT (even a/b/c/d row)
+//   inline figures   -> normalize HEIGHT (~text line height, flows inline)
+const QFIG_TARGET_W_MM   = 40;  // every question figure ~ this wide
+const QFIG_MAX_H_MM      = 55;  // ...unless that makes it taller than this
+const OPT_TARGET_H_MM    = 18;  // every option image ~ this tall
+const INLINE_TARGET_H_MM = 6.5; // inline figure height (a bit taller than the text)
+const IMG_MAX_UPSCALE    = 3;   // never enlarge a low-res source beyond this factor
+
+// Scale to a target along `mode` ('width'|'height'); `guard` caps the OTHER
+// dimension (so a normalized image never overflows), `maxUpscale` limits blur.
+function targetImageDims(filePath, mode, target, guard, maxUpscale) {
+  try {
+    const cached = _imageCache.get(filePath);
+    const buf = cached ? cached.buf : fs.readFileSync(filePath);
+    const dims = cached ? { width: cached.width, height: cached.height } : sizeOf(buf);
+    const w = dims.width, h = dims.height;
+    let scale = mode === "width" ? target / w : target / h;
+    if (maxUpscale) scale = Math.min(scale, maxUpscale);
+    if (guard) {
+      if (mode === "width" && h * scale > guard) scale = guard / h;
+      if (mode === "height" && w * scale > guard) scale = guard / w;
+    }
+    return { buf, width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+  } catch (e) {
+    return null;
+  }
+}
+
 function imageType(filePath) {
   // Trimmed images are always re-exported as PNG by preprocessImages(), regardless
   // of the source file's original extension.
@@ -272,9 +305,9 @@ function imageType(filePath) {
 const _IMG_MARKER = /\{img:([^}]+)\}/g;
 
 function inlineImageRun(p, opts) {
-  const maxW = opts.inlineMaxW || px(1.6);   // ~40mm; never upscaled by safeImageDims
-  const maxH = opts.inlineMaxH || px(1.2);
-  const info = safeImageDims(p, maxW, maxH);
+  // Normalize by HEIGHT so every inline figure matches the text line; width is
+  // guarded so a wide one can't overflow. Flows inline with the surrounding text.
+  const info = targetImageDims(p, "height", mm(INLINE_TARGET_H_MM), mm(35), IMG_MAX_UPSCALE);
   if (info) {
     return new ImageRun({ data: info.buf, transformation: { width: info.width, height: info.height }, type: imageType(p) });
   }
@@ -284,23 +317,24 @@ function inlineImageRun(p, opts) {
 function textToNodes(text, opts) {
   opts = opts || {};
   const s = String(text == null ? "" : text);
-  if (s.indexOf("{img:") === -1) return textToRuns(s, opts); // fast path, no inline images
+  const hasImg = s.indexOf("{img:") !== -1;
+  if (!hasImg && s.indexOf("\n") === -1) return textToRuns(s, opts); // fast path
   const out = [];
-  let needBreak = false, last = 0, m;
-  _IMG_MARKER.lastIndex = 0;
+  // a text segment: keep math-aware runs, turn newlines into <w:br/>
   const pushText = (seg) => {
     if (!seg) return;
-    if (needBreak) { out.push(new TextRun({ break: 1 })); needBreak = false; }
-    out.push(...textToRuns(seg, opts));
+    seg.split("\n").forEach((line, i) => {
+      if (i > 0) out.push(new TextRun({ break: 1 }));
+      if (line) out.push(...textToRuns(line, opts));
+    });
   };
-  const pushImg = (p) => {
-    if (out.length) out.push(new TextRun({ break: 1 })); // image starts a new line
-    out.push(inlineImageRun(p.trim(), opts));
-    needBreak = true;                                    // and the text after it, too
-  };
+  if (!hasImg) { pushText(s); return out; }
+  // inline images flow IN the text (no line break before/after)
+  let last = 0, m;
+  _IMG_MARKER.lastIndex = 0;
   while ((m = _IMG_MARKER.exec(s)) !== null) {
     pushText(s.slice(last, m.index));
-    pushImg(m[1]);
+    out.push(inlineImageRun(m[1].trim(), opts));
     last = m.index + m[0].length;
   }
   pushText(s.slice(last));
@@ -776,12 +810,11 @@ function contextBlockParagraphs(block, font, isHindi, range) {
     // chunk of the passage becomes its own real Paragraph (all keepLines),
     // instead of flattening the whole passage into one visual block.
     const paraTexts = String(block.text).split(/\n+/).map((t) => t.trim()).filter(Boolean);
-    const bodyParas = paraTexts.flatMap((t, i) => textToParagraphs(
-      t,
-      { size: FONT_SIZE.directions, font },
-      { spacing: { after: i === paraTexts.length - 1 ? 0 : 80 }, keepLines: true },
-      { imageParaProps: { keepLines: true } }
-    ));
+    const bodyParas = paraTexts.map((t, i) => new Paragraph({
+      spacing: { after: i === paraTexts.length - 1 ? 0 : 80 },
+      keepLines: true,
+      children: textToNodes(t, { size: FONT_SIZE.directions, font }),
+    }));
     const boxed = new Table({
       width: { size: CONTENT_WIDTH, type: WidthType.DXA },
       columnWidths: [CONTENT_WIDTH],
@@ -809,14 +842,13 @@ function contextBlockParagraphs(block, font, isHindi, range) {
     shading: shade,
     children: [new TextRun({ text: headingText, bold: true, italics: true, size: FONT_SIZE.directions, font })],
   });
-  const bodyParas = textToParagraphs(
-    block.text,
+  const bodyParas = [new Paragraph({
+    spacing: { after: 0 },
+    shading: shade,
     // question_block body is a "main question" (table/graph) — not bold; a
-    // real Directions call-out stays bold.
-    { size: FONT_SIZE.directions, font, bold: !isQuestionBlock, italics: true },
-    { spacing: { after: 0 }, shading: shade },
-    { imageParaProps: { shading: shade } }
-  );
+    // real Directions call-out stays bold. Inline images flow within the text.
+    children: textToNodes(block.text, { size: FONT_SIZE.directions, font, bold: !isQuestionBlock, italics: true }),
+  })];
   const boxed = new Table({
     width: { size: CONTENT_WIDTH, type: WidthType.DXA },
     columnWidths: [CONTENT_WIDTH],
@@ -864,10 +896,15 @@ function optionImageCapPx(tier) {
   return mm(capMm);
 }
 
+// Option figures normalize by HEIGHT (even a/b/c/d row), width guarded so a wide
+// one can't overflow its cell. Controlled upscale lifts low-res sources.
+function optionImageDims(imgPath) {
+  return targetImageDims(imgPath, "height", mm(OPT_TARGET_H_MM), mm(24), IMG_MAX_UPSCALE);
+}
+
 function estimateOptionWidth(opt, tier) {
   if (opt.image) {
-    const capPx = optionImageCapPx(tier);
-    const info = safeImageDims(opt.image, capPx, capPx);
+    const info = optionImageDims(opt.image);
     return info ? pxToTwips(info.width) + 260 : 900;
   }
   const len = (opt.label ? opt.label.length + 3 : 0) + (opt.text ? opt.text.length : 0);
@@ -876,8 +913,7 @@ function estimateOptionWidth(opt, tier) {
 
 function estimateOptionHeight(opt, tier) {
   if (opt.image) {
-    const capPx = optionImageCapPx(tier);
-    const info = safeImageDims(opt.image, capPx, capPx);
+    const info = optionImageDims(opt.image);
     return info ? pxToTwips(info.height) : 400;
   }
   return 260; // ~one text line
@@ -921,8 +957,7 @@ function chooseOptionLayout(options, availableWidth, tier) {
 function optionCellContent(opt, font, keepNext, optRef, tier) {
   const numbering = optRef ? { reference: optRef, level: 0 } : undefined;
   if (opt.image) {
-    const capPx = optionImageCapPx(tier);
-    const info = safeImageDims(opt.image, capPx, capPx);
+    const info = optionImageDims(opt.image);
     const paras = [];
     if (info) {
       paras.push(new Paragraph({
@@ -1066,30 +1101,24 @@ function renderQuestionInline(q, availableWidth, font, reasoningSec) {
     ? { tabStops: [{ type: TabStopType.RIGHT, position: availableWidth }] }  // flush to the column's right edge
     : {};
 
+  // Stem: ONE numbered paragraph. Inline {img:} figures flow within the text
+  // (textToNodes handles inline images + newlines); the "1." hangs to the left
+  // margin, text at the indent; marks/PYQ trail on the same line via the tab.
+  const stemRuns = textToNodes(q.question_text || "", { size: FONT_SIZE.question, font });
   const qNumRef = registerQuestionNumbering(q.display_number);
-  nodes.push(...textToParagraphs(
-    q.question_text,
-    { size: FONT_SIZE.question, font },
-    // continuation paragraphs (e.g. after an inline image) align at the indent
-    Object.assign({ spacing: { after: 40 }, indent: { left: QUESTION_INDENT } }, rightTab),
-    {
-      // the numbered line hangs the "1." back to the left margin, text at indent
-      firstParaProps: {
-        numbering: { reference: qNumRef, level: 0 },
-        indent: { left: QUESTION_INDENT, hanging: QUESTION_INDENT },
-      },
-      trailingRuns: stemTrailing,
-    }
-  ));
+  nodes.push(new Paragraph(Object.assign({
+    numbering: { reference: qNumRef, level: 0 },
+    indent: { left: QUESTION_INDENT, hanging: QUESTION_INDENT },
+    spacing: { after: 40 },
+    children: stemRuns.concat(stemTrailing),
+  }, rightTab)));
 
   if (q.question_images && q.question_images.length > 0) {
-    // Tiered cap (small/medium/large, by chapter) for reasoning questions;
-    // generic ~43x33mm default for everything else. A chapter-specific
-    // override (if present) wins over the tier cap. Never upscales.
-    const qCapMm = QUESTION_FIGURE_OVERRIDE_MM[q._chapter_name] || (tier ? QUESTION_FIGURE_CAP_MM[tier] : null);
-    const maxW = qCapMm ? mm(qCapMm) : px(1.7);
-    const maxH = qCapMm ? mm(qCapMm) : px(1.3);
-    const info = safeImageDims(q.question_images[0], maxW, maxH);
+    // Normalize question figures by WIDTH so every one is the same width across
+    // the paper (height follows aspect ratio, guarded so a tall one can't run
+    // away). Controlled upscale lifts low-res sources up to the target instead
+    // of leaving them tiny. Stays centered in the column.
+    const info = targetImageDims(q.question_images[0], "width", mm(QFIG_TARGET_W_MM), mm(QFIG_MAX_H_MM), IMG_MAX_UPSCALE);
     const p = info
       ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 30 }, children: [new ImageRun({ data: info.buf, transformation: { width: info.width, height: info.height }, type: imageType(q.question_images[0]) })] })
       : new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `[image missing: ${path.basename(q.question_images[0])}]`, italics: true, bold: true, size: FONT_SIZE.small, font })] });
@@ -1346,23 +1375,21 @@ function renderExplanationInline(q, availableWidth, font) {
   const steps = explanationSteps(q.explanation);
   const explLead = [new TextRun({ text: "Explanation:", bold: true, italics: true, size: 18, font })];
   if (steps.length <= 1) {
-    // "Explanation: <text>" on one line; any inline image splits to its own
-    // centered paragraph, with the "Explanation:" label leading the first line.
-    nodes.push(...textToParagraphs(
-      steps[0] || "",
-      { size: 18, font },
-      { spacing: { after: 90 } },
-      { leadingRuns: explLead.concat([new TextRun({ text: " ", size: 18, font })]) }
-    ));
+    // "Explanation: <text>" on one line; inline images flow within the text.
+    nodes.push(new Paragraph({
+      spacing: { after: 90 },
+      children: explLead
+        .concat([new TextRun({ text: " ", size: 18, font })])
+        .concat(textToNodes(steps[0] || "", { size: 18, font })),
+    }));
   } else {
     nodes.push(new Paragraph({ spacing: { after: 30 }, children: explLead }));
     steps.forEach((step, i) => {
-      nodes.push(...textToParagraphs(
-        step,
-        { size: 18, font },
-        { spacing: { after: i === steps.length - 1 ? 90 : 50 }, indent: { left: 220 } },
-        {}
-      ));
+      nodes.push(new Paragraph({
+        spacing: { after: i === steps.length - 1 ? 90 : 50 },
+        indent: { left: 220 },
+        children: textToNodes(step, { size: 18, font }),
+      }));
     });
   }
 
