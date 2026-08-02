@@ -280,6 +280,10 @@ const FIGURE_WIDTH_OVERRIDE_MM = {
   "रेखागणितीय चित्र पूरक (त्रिभुज, वर्ग, वृत्त)": 25,  // rekhaganitiya chitra poorak
   "आकृति निर्माण": 25,                                // aakriti nirmaan / Figure Construction
   "सन्निहित आकृतियाँ": 25,                            // sannihit aakritiyan / Embedded Figures
+  // English-book chapters (fixed 25mm regardless of aspect)
+  "Odd-Man-Out": 25,
+  "Figure Matching": 25,
+  "Geometrical Figure Completion": 25,
 };
 // Punched-hole chapter: 25mm ONLY when the figure is roughly square (1:1).
 const PUNCHED_HOLE_CHAPTER = "पंच नियंत्रित आकृति मोड़ना, खोलना";
