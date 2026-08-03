@@ -112,6 +112,7 @@ def select_paper(con, cfg, usage_map=None):
         raise ValueError(f"no book for class {class_number}")
     chapter_ids = [int(x) for x in (cfg.get("chapters") or [])]
     difficulties = list(cfg.get("difficulty") or [])
+    chmap = {c["id"]: c["name"] for c in chapters_for_book(con, book["id"])}
 
     sections_out = []
     blocks = {}
@@ -154,6 +155,7 @@ def select_paper(con, cfg, usage_map=None):
         for qid, _k in q_ids_ordered:
             q = fetch_full_question(con, qid)
             q["section_marks"] = None if bk["intact"] else bk["marks"]
+            q["_chapter_name"] = chmap.get(q.get("chapter_id"))
             questions.append(q)
             chosen_ids.append(qid)
 
