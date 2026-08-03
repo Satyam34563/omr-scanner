@@ -117,7 +117,15 @@ def select_paper(con, cfg, usage_map=None):
     sections_out = []
     blocks = {}
 
-    for bk in _bp.resolve_buckets(cfg):
+    # Buckets: explicit per-section counts (blueprint), OR scale the default
+    # blueprint proportionally to hit a target total (marks or questions).
+    target_mode = cfg.get("target_mode", "blueprint")
+    if target_mode in ("marks", "questions"):
+        buckets = _scaled_buckets(target_mode, float(cfg.get("target_value") or 0))
+    else:
+        buckets = _bp.resolve_buckets(cfg)
+
+    for bk in buckets:
         rows = _candidates(con, book["id"], bk["types"], bk.get("marks"), chapter_ids, difficulties, bk["intact"])
         q_ids_ordered = []  # (qid, sort_key) preserving chapter grouping
 
@@ -190,6 +198,20 @@ def select_paper(con, cfg, usage_map=None):
         "sections": sections_out, "context_blocks": blocks, "warnings": warnings,
     }
     return content, chosen_ids
+
+
+def _scaled_buckets(target_mode, target_value):
+    """Scale the DEFAULT blueprint's counts proportionally to hit a target total
+    (marks or question-units), keeping the section proportions."""
+    buckets = _bp.default_blueprint()
+    if target_value and target_value > 0:
+        cur = (sum(b["count"] * b["marks"] for b in buckets) if target_mode == "marks"
+               else sum(b["count"] for b in buckets))
+        if cur > 0:
+            f = target_value / cur
+            for b in buckets:
+                b["count"] = max(0, round(b["count"] * f))
+    return [b for b in buckets if b["count"] > 0]
 
 
 def _resolve_take(bucket, caps, rng, strategy):
