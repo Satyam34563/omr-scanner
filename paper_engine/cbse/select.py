@@ -183,6 +183,7 @@ def select_paper(con, cfg, usage_map=None):
         "subject": book.get("subject"), "book_title": book.get("title"),
         "exam_duration": cfg.get("exam_duration", "3 Hours"),
         "max_marks": round(max_marks, 1),
+        "two_column": bool(cfg.get("two_column", False)),
         "sections": sections_out, "context_blocks": blocks, "warnings": warnings,
     }
     return content, chosen_ids
