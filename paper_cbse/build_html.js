@@ -96,7 +96,8 @@ function optionsHtml(q) {
 
 function questionHtml(q) {
   const stem = renderLatex(q.question_latex || q.question_text || "");
-  const marks = q.section_marks != null ? `<span class="marks">[${q.section_marks}]</span>` : "";
+  const marks = (data.show_question_marks !== false && q.section_marks != null)
+    ? `<span class="marks">[${q.section_marks}]</span>` : "";
   return `<div class="q">
     <div class="qhead"><span class="qno">${q.display_number}.</span>
       <div class="qbody">${stem}${marks}${questionImages(q)}${optionsHtml(q)}</div>
