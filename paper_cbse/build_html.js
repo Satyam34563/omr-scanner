@@ -39,10 +39,15 @@ function esc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Escape, but keep the source's inline emphasis tags (<b>, <i>, <u>, <sup>,
-// <sub>, <br>) — the question text uses them for emphasis (e.g. "<b>not</b>").
+// Escape, but keep the source's inline emphasis: HTML tags (<b>/<i>/<u>/<sup>/
+// <sub>/<br>) AND markdown (**bold** / *italic*) — the question text uses both
+// (e.g. "<b>not</b>" and "**not**") to emphasise words like "not".
 function escText(s) {
-  return esc(s).replace(/&lt;(\/?(?:b|i|u|sup|sub|br)\s*\/?)&gt;/gi, "<$1>");
+  s = esc(s);
+  s = s.replace(/&lt;(\/?(?:b|i|u|sup|sub|br)\s*\/?)&gt;/gi, "<$1>"); // whitelisted HTML tags
+  s = s.replace(/\*\*([^*]+?)\*\*/g, "<b>$1</b>");                    // **bold**
+  s = s.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");      // *italic* (single, not **)
+  return s;
 }
 
 // Render a mixed prose + $...$ / $$...$$ string to HTML.
