@@ -29,6 +29,12 @@ if (!contentPath || !outPath) {
 
 const data = JSON.parse(fs.readFileSync(contentPath, "utf8"));
 
+// School branding (logo + name + address) — same source as the competitive papers.
+const schoolCfgPath = arg("school-config", path.join(imageBase, "school_config.json"));
+let school = {};
+try { school = JSON.parse(fs.readFileSync(schoolCfgPath, "utf8")); } catch (e) { school = {}; }
+const schoolDir = path.dirname(schoolCfgPath);
+
 // ---- KaTeX CSS with absolute font paths (so weasyprint resolves them) ----
 const katexDist = path.join(__dirname, "node_modules", "katex", "dist");
 let katexCss = fs.readFileSync(path.join(katexDist, "katex.min.css"), "utf8");
@@ -170,15 +176,35 @@ const BASE_CSS = `${katexCss}
   .head .sub { font-size: 10.5pt; color: #333; }
   .katex { font-size: 1.02em; }`;
 
+const BRAND_CSS = `
+  .brand { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
+  .brand .blogo img { height: 19mm; display: block; }
+  .brand .binfo { flex: 1; text-align: center; }
+  .brand .bname { font-weight: 700; font-size: 15pt; letter-spacing: .3px; }
+  .brand .binfo .adr { font-size: 8.4pt; color: #333; }
+  .ptitle { text-align: center; font-size: 13pt; font-weight: 700; margin: 4px 0 6px; text-decoration: underline; }`;
+
 function docHead(extraCss) {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_CSS}${extraCss || ""}</style></head><body>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_CSS}${BRAND_CSS}${extraCss || ""}</style></head><body>` + brandHeader();
+}
+
+function brandHeader() {
+  if (!school.school) return "";
+  var logo = "";
+  if (school.logo) {
+    var lp = path.isAbsolute(school.logo) ? school.logo : path.join(schoolDir, school.logo);
+    if (fs.existsSync(lp)) logo = '<img src="file://' + lp + '">';
+  }
+  var addr = (school.addressLines || []).map(function (l) { return '<div class="adr">' + esc(l) + "</div>"; }).join("");
+  return '<div class="brand">' + (logo ? '<div class="blogo">' + logo + "</div>" : "") +
+    '<div class="binfo"><div class="bname">' + esc((school.school || "").toUpperCase()) + "</div>" + addr + "</div></div>";
 }
 function subtitle(tag) {
   return [data.class_label ? "Class " + data.class_label : "", data.subject, tag].filter(Boolean).join(" · ");
 }
 function headBlock(tag) {
-  var t = data.paper_title || "Question Paper";
-  return `<div class="head"><h1>${esc(t)}</h1><div class="sub">${esc(subtitle(tag))}</div></div>`;
+  return `<div class="ptitle">${esc(data.paper_title || "Question Paper")}</div>` +
+    `<div style="text-align:center;font-size:10pt;color:#333;margin-bottom:8px;">${esc(subtitle(tag))}</div>`;
 }
 
 function paperHtml() {
@@ -204,7 +230,8 @@ function paperHtml() {
     .qimg { display: block; max-width: 55mm; margin: 4px 0; }
     .case { background: #f4f4f4; border: 0.5px solid #999; padding: 6px 8px; margin: 6px 0; font-size: 10.3pt; break-inside: avoid; ${twoCol ? "column-span: all;" : ""} }`;
   return docHead(css) +
-    `<div class="head"><h1>${esc(data.paper_title || "Question Paper")}</h1>${data.book_title ? `<div class="sub">${esc(data.book_title)}</div>` : ""}</div>` +
+    `<div class="ptitle">${esc(data.paper_title || "Question Paper")}</div>` +
+    (data.book_title ? `<div style="text-align:center;font-size:9.5pt;color:#444;margin:-2px 0 6px;">${esc(data.book_title)}</div>` : "") +
     `<table class="metabar"><tr>${metaRow}</tr></table>` + instructionsHtml() +
     `<div class="flow">${data.sections.map(sectionHtml).join("")}</div></body></html>`;
 }

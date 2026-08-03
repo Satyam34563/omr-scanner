@@ -15,24 +15,33 @@ from engine import db
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", required=True)
-    ap.add_argument("--query", required=True, choices=["classes", "chapters", "difficulties"])
+    ap.add_argument("--query", required=True, choices=["classes", "subjects", "chapters", "difficulties"])
     ap.add_argument("--class-number", type=int)
+    ap.add_argument("--subject")
     args = ap.parse_args()
 
     con = db.connect_questions(args.db)
     if args.query == "classes":
         result = db.dicts(
             con,
-            "SELECT DISTINCT b.class_number, b.class_level, b.subject "
-            "FROM books b ORDER BY b.class_number",
+            "SELECT DISTINCT b.class_number, b.class_level FROM books b ORDER BY b.class_number",
         )
+    elif args.query == "subjects":
+        result = [r["subject"] for r in db.dicts(
+            con, "SELECT DISTINCT subject FROM books WHERE class_number=? AND subject IS NOT NULL ORDER BY subject",
+            (args.class_number,))]
     elif args.query == "chapters":
+        where = "b.class_number = ?"
+        params = [args.class_number]
+        if args.subject:
+            where += " AND b.subject = ?"
+            params.append(args.subject)
         result = db.dicts(
             con,
             "SELECT c.id, c.name, c.chapter_number "
             "FROM chapters c JOIN books b ON c.book_id = b.id "
-            "WHERE b.class_number = ? ORDER BY c.chapter_number",
-            (args.class_number,),
+            f"WHERE {where} ORDER BY c.chapter_number",
+            params,
         )
     else:  # difficulties
         result = [r["difficulty"] for r in db.dicts(
