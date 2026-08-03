@@ -22,3 +22,6 @@ paper_docx/generated_papers/
 # Editors
 .vscode/
 .idea/
+
+# CBSE builder node deps
+paper_cbse/node_modules/

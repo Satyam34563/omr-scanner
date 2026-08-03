@@ -1,0 +1,5 @@
+{
+  "name": "paper-cbse-builder",
+  "private": true,
+  "dependencies": { "katex": "^0.16.11" }
+}
