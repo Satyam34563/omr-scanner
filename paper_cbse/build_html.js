@@ -29,11 +29,26 @@ if (!contentPath || !outPath) {
 
 const data = JSON.parse(fs.readFileSync(contentPath, "utf8"));
 
-// School branding (logo + name + address) — same source as the competitive papers.
-const schoolCfgPath = arg("school-config", path.join(imageBase, "school_config.json"));
-let school = {};
-try { school = JSON.parse(fs.readFileSync(schoolCfgPath, "utf8")); } catch (e) { school = {}; }
-const schoolDir = path.dirname(schoolCfgPath);
+// School branding (logo + name + address). Tried in order: --school-config,
+// <image-base>/school_config.json, then the competitive builder's copy that
+// ships with this repo (paper_docx/school_config.json) — so the brand header
+// still renders on servers where the question-bank folder lacks the config.
+const schoolCandidates = [
+  arg("school-config", ""),
+  path.join(imageBase, "school_config.json"),
+  path.join(__dirname, "..", "paper_docx", "school_config.json"),
+].filter(Boolean);
+let school = {}, schoolDir = imageBase || __dirname;
+for (const cand of schoolCandidates) {
+  try {
+    school = JSON.parse(fs.readFileSync(cand, "utf8"));
+    schoolDir = path.dirname(cand);
+    break;
+  } catch (e) { /* try next */ }
+}
+if (!school.school) {
+  console.error("warning: no school_config.json found (tried: " + schoolCandidates.join(", ") + ") — brand header will be empty.");
+}
 
 // Absolute logo path (header + optional page watermark)
 let logoAbs = "";
