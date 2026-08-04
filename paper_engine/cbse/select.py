@@ -183,7 +183,7 @@ def select_paper(con, cfg, usage_map=None):
         "book_title": None if multi else first_book.get("title"),
         "exam_duration": cfg.get("exam_duration", "3 Hours"),
         "purpose": cfg.get("purpose", "exam"),
-        "output_format": cfg.get("output_format", "docx"),
+        "output_format": cfg.get("output_format", "pdf"),
         "exam_date": cfg.get("exam_date"),
         "watermark": bool(cfg.get("watermark", True)),
         "max_marks": round(max_marks, 1),
