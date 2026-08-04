@@ -209,7 +209,7 @@ function instructionsHtml() {
 // ---- shared document shell ----
 const BASE_CSS = `${katexCss}
   @page { size: A4; margin: 10mm 9mm; }
-  * { font-family: "Noto Serif", "Times New Roman", serif; }
+  * { font-family: "Times New Roman", "Liberation Serif", "Noto Serif", serif; }
   body { font-size: 11pt; color: #111; line-height: 1.4; }
   .head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
   .head h1 { font-size: 16pt; margin: 0 0 2px; letter-spacing: .3px; }
@@ -219,8 +219,9 @@ const BASE_CSS = `${katexCss}
 const BRAND_CSS = `
   .brand { display: flex; align-items: center; gap: 38px; border-bottom: 2.5px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
   .brand .blogo img { height: 19mm; display: block; }
+  .brand .binfo, .brand .binfo * { font-family: Georgia, "Times New Roman", serif; }
   .brand .binfo { flex: 1; text-align: left; line-height: 1.22; }
-  .brand .bname { font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: 17pt; letter-spacing: .4px; margin: 0; line-height: 1.05; color: #000; }
+  .brand .bname { font-weight: 700; font-size: 17pt; letter-spacing: .4px; margin: 0; line-height: 1.05; color: #000; }
   .brand .binfo .adr { font-size: 8.7pt; color: #2a2a2a; margin: 0; }
   .ptitle { text-align: center; font-size: 13pt; font-weight: 700; margin: 6px 0 8px; letter-spacing: .3px; }`;
 
