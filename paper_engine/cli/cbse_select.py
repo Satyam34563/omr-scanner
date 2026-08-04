@@ -40,7 +40,10 @@ def main():
     ucon = usage.connect_usage(args.usage_db)
     usage_map = usage.usage_map(ucon)
 
-    content, chosen_ids = select.select_paper(con, cfg, usage_map)
+    try:
+        content, chosen_ids = select.select_paper(con, cfg, usage_map)
+    except ValueError as e:
+        raise SystemExit(f"invalid configuration: {e}")
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(content, f, ensure_ascii=False, indent=2)

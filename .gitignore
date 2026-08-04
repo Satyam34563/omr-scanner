@@ -25,3 +25,6 @@ paper_docx/generated_papers/
 
 # CBSE builder node deps
 paper_cbse/node_modules/
+
+# CBSE usage sidecar (runtime)
+paper_engine/cbse_usage.db*

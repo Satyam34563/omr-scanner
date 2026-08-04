@@ -24,6 +24,12 @@ actually holds, so paper marks are honest).
 DEFAULT_BUCKETS = [
     {"key": "A_MCQ", "code": "A", "title": "Section A", "instruction": "Multiple Choice Questions — 1 mark each.",
      "types": ["mcq"], "marks": 1, "count": 16, "intact": False},
+    {"key": "A_MCQ2", "code": "A", "title": "", "instruction": "Multiple Choice Questions — 2 marks each.",
+     "types": ["mcq"], "marks": 2, "count": 0, "intact": False},
+    {"key": "A_MCQ3", "code": "A", "title": "", "instruction": "Multiple Choice Questions — 3 marks each.",
+     "types": ["mcq"], "marks": 3, "count": 0, "intact": False},
+    {"key": "A_MCQ5", "code": "A", "title": "", "instruction": "Multiple Choice Questions — 5 marks each.",
+     "types": ["mcq"], "marks": 5, "count": 0, "intact": False},
     {"key": "A_AR", "code": "A", "title": "", "instruction": "Assertion–Reason — 1 mark each.",
      "types": ["assertion_reason"], "marks": 1, "count": 4, "intact": False},
     {"key": "B", "code": "B", "title": "Section B", "instruction": "Very Short Answer.",

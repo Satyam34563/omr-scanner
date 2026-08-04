@@ -35,6 +35,22 @@ let school = {};
 try { school = JSON.parse(fs.readFileSync(schoolCfgPath, "utf8")); } catch (e) { school = {}; }
 const schoolDir = path.dirname(schoolCfgPath);
 
+// Absolute logo path (header + optional page watermark)
+let logoAbs = "";
+if (school.logo) {
+  const lp = path.isAbsolute(school.logo) ? school.logo : path.join(schoolDir, school.logo);
+  if (fs.existsSync(lp)) logoAbs = lp;
+}
+
+// "2026-08-10" -> "10 Aug 2026" (falls back to the raw string)
+function fmtDate(s) {
+  if (!s) return "";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(s);
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return parseInt(m[3], 10) + " " + MON[parseInt(m[2], 10) - 1] + " " + m[1];
+}
+
 // ---- KaTeX CSS with absolute font paths (so weasyprint resolves them) ----
 const katexDist = path.join(__dirname, "node_modules", "katex", "dist");
 let katexCss = fs.readFileSync(path.join(katexDist, "katex.min.css"), "utf8");
@@ -135,7 +151,8 @@ function sectionHtml(sec) {
 function sectionSummary() {
   var order = [], by = {};
   data.sections.forEach(function (s) {
-    if (!by[s.code]) { by[s.code] = { code: s.code, count: 0, marks: s.marks_per, intact: s.intact_blocks }; order.push(s.code); }
+    if (!by[s.code]) { by[s.code] = { code: s.code, count: 0, marks: s.marks_per, mixed: false, intact: s.intact_blocks }; order.push(s.code); }
+    if (s.marks_per !== by[s.code].marks) by[s.code].mixed = true;   // e.g. 1/2/3/5-mark MCQs in one section
     if (s.intact_blocks) {
       var cases = {};
       s.questions.forEach(function (q) { if (q.context_block_id != null) cases[q.context_block_id] = 1; });
@@ -151,24 +168,32 @@ function instructionsHtml() {
   var groups = sectionSummary();
   var totalUnits = groups.reduce(function (a, g) { return a + g.count; }, 0);
   var perSection = groups.map(function (g) {
+    var tail = g.mixed ? " (marks as indicated against each)"
+      : " of " + g.marks + " mark" + (g.marks === 1 ? "" : "s") + " each";
     return "Section " + g.code + " has " + g.count + (g.intact ? " case-based question" : " question") +
-      (g.count === 1 ? "" : "s") + " of " + g.marks + " mark" + (g.marks === 1 ? "" : "s") + " each";
+      (g.count === 1 ? "" : "s") + tail;
   }).join("; ");
   var lines = [
     "This question paper contains " + totalUnits + " questions in " + groups.length +
       " sections — " + groups.map(function (g) { return g.code; }).join(", ") + ".",
+  ];
+  if (data.multi_subject && (data.subjects || []).length) {
+    lines.push("The paper is organised in subject parts — " + data.subjects.join(", ") +
+      " — each beginning under its own heading; attempt every part.");
+  }
+  lines = lines.concat([
     "All questions are compulsory. Internal choice is not provided unless stated.",
     perSection + ".",
     "Marks for each question are indicated against it.",
     "Draw neat, labelled figures wherever required; use of calculators is not permitted.",
-  ];
+  ]);
   return '<div class="ginstr"><div class="gtitle">General Instructions:</div><ol>' +
     lines.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ol></div>";
 }
 
 // ---- shared document shell ----
 const BASE_CSS = `${katexCss}
-  @page { size: A4; margin: 15mm 13mm; }
+  @page { size: A4; margin: 10mm 9mm; }
   * { font-family: "Noto Serif", "Times New Roman", serif; }
   body { font-size: 11pt; color: #111; line-height: 1.4; }
   .head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
@@ -177,12 +202,12 @@ const BASE_CSS = `${katexCss}
   .katex { font-size: 1.02em; }`;
 
 const BRAND_CSS = `
-  .brand { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
+  .brand { display: flex; align-items: center; gap: 38px; border-bottom: 2.5px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
   .brand .blogo img { height: 19mm; display: block; }
-  .brand .binfo { flex: 1; text-align: center; }
-  .brand .bname { font-weight: 700; font-size: 15pt; letter-spacing: .3px; }
-  .brand .binfo .adr { font-size: 8.4pt; color: #333; }
-  .ptitle { text-align: center; font-size: 13pt; font-weight: 700; margin: 4px 0 6px; text-decoration: underline; }`;
+  .brand .binfo { flex: 1; text-align: left; line-height: 1.22; }
+  .brand .bname { font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: 17pt; letter-spacing: .4px; margin: 0; line-height: 1.05; color: #000; }
+  .brand .binfo .adr { font-size: 8.7pt; color: #2a2a2a; margin: 0; }
+  .ptitle { text-align: center; font-size: 13pt; font-weight: 700; margin: 6px 0 8px; letter-spacing: .3px; }`;
 
 function docHead(extraCss) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_CSS}${BRAND_CSS}${extraCss || ""}</style></head><body>` + brandHeader();
@@ -195,7 +220,9 @@ function brandHeader() {
     var lp = path.isAbsolute(school.logo) ? school.logo : path.join(schoolDir, school.logo);
     if (fs.existsSync(lp)) logo = '<img src="file://' + lp + '">';
   }
-  var addr = (school.addressLines || []).map(function (l) { return '<div class="adr">' + esc(l) + "</div>"; }).join("");
+  var addr = (school.addressLines || [])
+    .filter(function (l) { return !/reg\.?\s*code/i.test(l || ""); })
+    .map(function (l) { return '<div class="adr">' + esc(l) + "</div>"; }).join("");
   return '<div class="brand">' + (logo ? '<div class="blogo">' + logo + "</div>" : "") +
     '<div class="binfo"><div class="bname">' + esc((school.school || "").toUpperCase()) + "</div>" + addr + "</div></div>";
 }
@@ -208,32 +235,65 @@ function headBlock(tag) {
 }
 
 function paperHtml() {
-  var metaRow = [
-    ["Class", data.class_label ? esc(data.class_label) : "—"],
-    ["Subject", esc(data.subject || "—")],
-    ["Time Allowed", esc(data.exam_duration || "—")],
-    ["Maximum Marks", esc(data.max_marks)],
-  ].map(function (c) { return '<td><span class="mk">' + c[0] + ':</span> ' + c[1] + "</td>"; }).join("");
+  var homework = data.purpose === "homework";
+  var dateStr = fmtDate(data.exam_date);
+  var cells = [["Class", data.class_label ? esc(data.class_label) : "—"]];
+  if (!data.multi_subject) cells.push(["Subject", esc(data.subject || "—")]);
+  if (!homework) {
+    cells.push(["Time Allowed", esc(data.exam_duration || "—")]);
+    cells.push(["Maximum Marks", esc(data.max_marks)]);
+  }
+  if (homework) cells.push(["Date", dateStr ? esc(dateStr) : "____________"]);
+  var metaRow = cells.map(function (c) { return '<td><span class="mk">' + c[0] + ':</span> ' + c[1] + "</td>"; }).join("");
   var twoCol = data.two_column === true;
-  var css = `
-    table.metabar { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10pt; }
-    table.metabar td { border: 0.75px solid #000; padding: 4px 8px; } table.metabar .mk { color: #444; }
-    .ginstr { border: 0.75px solid #000; padding: 6px 10px; margin: 0 0 12px; font-size: 9.6pt; }
+
+  // Page footer: school name · date · "Page x of y" — in the bottom margin box.
+  var footFont = 'font-size: 8pt; color: #333; font-family: "Noto Serif", "Times New Roman", serif;';
+  var pageExtras = `
+    @page {
+      @bottom-left { content: ${JSON.stringify((school.school || "").toUpperCase())}; ${footFont} }
+      @bottom-center { content: ${JSON.stringify(dateStr)}; ${footFont} }
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); ${footFont} }
+      ${data.watermark && logoAbs
+        ? `background-image: linear-gradient(rgba(255,255,255,0.955), rgba(255,255,255,0.955)), url("file://${logoAbs}");
+           background-repeat: no-repeat; background-position: center, center;
+           background-size: 210mm 297mm, 95mm;`
+        : ""}
+    }`;
+  var css = pageExtras + `
+    table.metabar { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10pt; border-top: 1.2px solid #000; border-bottom: 1.2px solid #000; }
+    table.metabar td { padding: 5px 8px; text-align: center; } table.metabar .mk { color: #444; }
+    table.metabar td:first-child { text-align: left; }
+    table.metabar td:last-child { text-align: right; }
+    .ginstr { padding: 2px 0 0; margin: 0 0 8px; font-size: 9.6pt; }
     .ginstr .gtitle { font-weight: 700; text-decoration: underline; margin-bottom: 3px; }
     .ginstr ol { margin: 0; padding-left: 18px; } .ginstr li { margin: 1px 0; }
-    .flow { ${twoCol ? "column-count: 2; column-gap: 8mm; column-rule: 0.5px solid #ccc;" : ""} }
+    .flow { ${twoCol ? "column-count: 2; column-gap: 8mm; column-rule: 1.2px solid #000;" : ""} }
     h2.sec { font-size: 12.5pt; text-align: center; margin: 12px 0 2px; border-top: 1px solid #000; padding-top: 5px; ${twoCol ? "column-span: all;" : ""} }
     .secnote { text-align: center; font-size: 9.5pt; color: #444; font-style: italic; margin: 0 0 7px; ${twoCol ? "column-span: all;" : ""} }
     .q { margin: 0 0 9px; break-inside: avoid; } .qhead { display: flex; gap: 6px; } .qno { font-weight: 700; } .qbody { flex: 1; }
     .marks { float: right; color: #333; font-weight: 600; }
     .opts { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 22px; } .opt { min-width: 40%; }
     .qimg { display: block; max-width: 55mm; margin: 4px 0; }
-    .case { background: #f4f4f4; border: 0.5px solid #999; padding: 6px 8px; margin: 6px 0; font-size: 10.3pt; break-inside: avoid; ${twoCol ? "column-span: all;" : ""} }`;
+    .case { background: #f4f4f4; border: 0.5px solid #999; padding: 6px 8px; margin: 6px 0; font-size: 10.3pt; break-inside: avoid; ${twoCol ? "column-span: all;" : ""} }
+    h2.subjpart { font-size: 13.5pt; text-align: center; text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 0; border-top: 2px solid #000; padding: 4px 0 0; ${twoCol ? "column-span: all;" : ""} }`;
   return docHead(css) +
     `<div class="ptitle">${esc(data.paper_title || "Question Paper")}</div>` +
-    (data.book_title ? `<div style="text-align:center;font-size:9.5pt;color:#444;margin:-2px 0 6px;">${esc(data.book_title)}</div>` : "") +
     `<table class="metabar"><tr>${metaRow}</tr></table>` + instructionsHtml() +
-    `<div class="flow">${data.sections.map(sectionHtml).join("")}</div></body></html>`;
+    `<div class="flow">${bodyWithSubjects()}</div></body></html>`;
+}
+
+// Emit a subject "Part" heading before each subject's first section (multi-subject papers).
+function bodyWithSubjects() {
+  var html = "", cur = null;
+  data.sections.forEach(function (sec) {
+    if (data.multi_subject && sec.subject && sec.subject !== cur) {
+      cur = sec.subject;
+      html += '<h2 class="subjpart">' + esc(cur) + "</h2>";
+    }
+    html += sectionHtml(sec);
+  });
+  return html;
 }
 
 function eachQuestion(fn) {
@@ -246,36 +306,54 @@ function answerOf(q) {
     : renderLatex(q.correct_answer_latex || q.correct_answer || "—");
 }
 
+// A subject heading emitted (once per subject) inside answer/solution lists.
+function subjMark(sec, state, cls) {
+  if (!data.multi_subject || !sec.subject || sec.subject === state.cur) return "";
+  state.cur = sec.subject;
+  return '<div class="' + cls + '">' + esc(sec.subject) + "</div>";
+}
+
 function answersHtml() {
-  var items = [];
-  eachQuestion(function (q) { items.push('<div class="ai"><b>' + q.display_number + ".</b> " + answerOf(q) + "</div>"); });
-  var css = ".wrap{column-count:4;column-gap:6mm;} .ai{break-inside:avoid;margin:3px 0;font-size:11pt;}";
+  var items = [], st = { cur: null }, onlyObjective = true;
+  eachQuestion(function (q, sec) {
+    if (q.type !== "mcq" && q.type !== "assertion_reason") onlyObjective = false;
+    items.push(subjMark(sec, st, "asub") + '<div class="ai"><b>' + q.display_number + ".</b> " + answerOf(q) + "</div>");
+  });
+  // Objective-only keys are short "(a)"-style answers — 4 columns fit; papers
+  // with written-answer types carry longer answers, so give them 3 columns.
+  var cols = onlyObjective ? 4 : 3;
+  var css = ".wrap{column-count:" + cols + ";column-gap:6mm;} .ai{break-inside:avoid;margin:3px 0;font-size:11pt;}" +
+    " .asub{column-span:all;break-inside:avoid;font-weight:700;text-transform:uppercase;font-size:11pt;margin:8px 0 3px;border-bottom:1px solid #000;}";
   return docHead(css) + headBlock("Answer Key") + '<div class="wrap">' + items.join("") + "</div></body></html>";
 }
 
 function solutionsHtml() {
-  var html = "";
-  eachQuestion(function (q) {
+  var html = "", st = { cur: null };
+  eachQuestion(function (q, sec) {
+    html += subjMark(sec, st, "ssub");
     var sol = q.detailed_solution || q.explanation_latex || q.explanation || "";
     html += '<div class="sol"><div class="sq"><b>' + q.display_number + ".</b> " +
       renderLatex(q.question_latex || q.question_text || "") + "</div>" +
       '<div class="sa"><b>Answer:</b> ' + answerOf(q) + "</div>" +
       (sol ? '<div class="se">' + renderLatex(sol) + "</div>" : "") + "</div>";
   });
-  var css = ".sol{margin:0 0 11px;break-inside:avoid;} .sq{margin-bottom:2px;} .sa{color:#065; font-size:10pt;} .se{margin-top:2px;font-size:10.3pt;color:#222;}";
+  var css = ".sol{margin:0 0 11px;break-inside:avoid;} .sq{margin-bottom:2px;} .sa{color:#065; font-size:10pt;} .se{margin-top:2px;font-size:10.3pt;color:#222;}" +
+    " .ssub{font-weight:700;text-transform:uppercase;font-size:12pt;margin:10px 0 5px;border-bottom:1px solid #000;}";
   return docHead(css) + headBlock("Solutions & Explanations") + html + "</body></html>";
 }
 
 function metadataHtml() {
-  var COLS = [["#", "n"], ["Chapter", "chapter"], ["Type", "type"], ["Marks", "marks"],
+  var COLS = [["#", "n"]];
+  if (data.multi_subject) COLS.push(["Subject", "subject"]);
+  COLS = COLS.concat([["Chapter", "chapter"], ["Type", "type"], ["Marks", "marks"],
     ["Difficulty", "difficulty"], ["Topic", "topic"], ["Cognitive", "cognitive_level"],
-    ["Page", "source_page"], ["PYQ", "pyq"]];
+    ["Page", "source_page"], ["PYQ", "pyq"]]);
   var head = COLS.map(function (c) { return "<th>" + c[0] + "</th>"; }).join("");
   var rows = "";
-  eachQuestion(function (q) {
+  eachQuestion(function (q, sec) {
     var pyq = q.is_pyq ? [q.pyq_exam, q.pyq_year].filter(Boolean).join(" ") : "";
     var val = {
-      n: q.display_number, chapter: q._chapter_name || "", type: q.type || "",
+      n: q.display_number, subject: sec.subject || "", chapter: q._chapter_name || "", type: q.type || "",
       marks: q.marks != null ? q.marks : (q.section_marks != null ? q.section_marks : ""),
       difficulty: q.difficulty || "", topic: q.topic || "", cognitive_level: q.cognitive_level || "",
       source_page: q.source_page != null ? q.source_page : "", pyq: pyq,

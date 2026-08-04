@@ -43,6 +43,35 @@ def main():
             f"WHERE {where} ORDER BY c.chapter_number",
             params,
         )
+        # availability: question counts per chapter, broken down by type and
+        # by (type, marks) — the blueprint buckets are keyed on both.
+        counts = db.dicts(
+            con,
+            "SELECT q.chapter_id, q.type, q.marks, COUNT(*) AS n "
+            "FROM questions q JOIN chapters c ON q.chapter_id = c.id JOIN books b ON c.book_id = b.id "
+            f"WHERE {where} GROUP BY q.chapter_id, q.type, q.marks",
+            params,
+        )
+        blocks = db.dicts(
+            con,
+            "SELECT q.chapter_id, COUNT(DISTINCT q.context_block_id) AS n "
+            "FROM questions q JOIN chapters c ON q.chapter_id = c.id JOIN books b ON c.book_id = b.id "
+            f"WHERE {where} AND q.context_block_id IS NOT NULL GROUP BY q.chapter_id",
+            params,
+        )
+        by, by_marks = {}, {}
+        for r in counts:
+            by.setdefault(r["chapter_id"], {})
+            by[r["chapter_id"]][r["type"]] = by[r["chapter_id"]].get(r["type"], 0) + r["n"]
+            m = r["marks"]
+            mkey = f"{r['type']}_{int(m) if m == int(m) else m}"
+            by_marks.setdefault(r["chapter_id"], {})[mkey] = r["n"]
+        blmap = {r["chapter_id"]: r["n"] for r in blocks}
+        for ch in result:
+            ch["counts"] = by.get(ch["id"], {})
+            ch["counts_marks"] = by_marks.get(ch["id"], {})
+            ch["case_blocks"] = blmap.get(ch["id"], 0)
+            ch["total"] = sum(ch["counts"].values())
     else:  # difficulties
         result = [r["difficulty"] for r in db.dicts(
             con, "SELECT DISTINCT difficulty FROM questions WHERE difficulty IS NOT NULL ORDER BY difficulty")]
