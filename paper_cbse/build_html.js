@@ -344,16 +344,24 @@ function answersHtml() {
 }
 
 function solutionsHtml() {
-  var html = "", st = { cur: null };
+  var html = "", st = { cur: null }, n = 0;
   eachQuestion(function (q, sec) {
     html += subjMark(sec, st, "ssub");
+    // Chunk marker every 20 solutions: cli/cbse_pdf renders the pieces
+    // separately and concatenates the pages — bounds weasyprint's memory and
+    // sidesteps pathological whole-document relayouts on big papers.
+    if (n > 0 && n % 20 === 0) html += "<!--CHUNK-->";
+    n++;
     var sol = q.detailed_solution || q.explanation_latex || q.explanation || "";
     html += '<div class="sol"><div class="sq"><b>' + q.display_number + ".</b> " +
       renderLatex(q.question_latex || q.question_text || "") + "</div>" +
       '<div class="sa"><b>Answer:</b> ' + answerOf(q) + "</div>" +
       (sol ? '<div class="se">' + renderLatex(sol) + "</div>" : "") + "</div>";
   });
-  var css = ".sol{margin:0 0 11px;break-inside:avoid;} .sq{margin-bottom:2px;} .sa{color:#065; font-size:10pt;} .se{margin-top:2px;font-size:10.3pt;color:#222;}" +
+  // NOTE: no break-inside:avoid on .sol — a worked solution can be taller than
+  // a page, and forcing it unbreakable sends older weasyprint versions into a
+  // near-endless relayout (the 30-minute "hang" seen in production).
+  var css = ".sol{margin:0 0 11px;} .sq{margin-bottom:2px;} .sa{color:#065; font-size:10pt;} .se{margin-top:2px;font-size:10.3pt;color:#222;}" +
     " .ssub{font-weight:700;text-transform:uppercase;font-size:12pt;margin:10px 0 5px;border-bottom:1px solid #000;}";
   return docHead(css) + headBlock("Solutions & Explanations") + html + "</body></html>";
 }
