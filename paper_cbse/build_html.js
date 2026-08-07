@@ -122,6 +122,12 @@ function questionImages(q) {
   return arr.map(imgTag).join("");
 }
 
+function explanationImages(q) {
+  let arr = [];
+  try { arr = q.explanation_images ? JSON.parse(q.explanation_images) : []; } catch (e) { arr = []; }
+  return arr.map(imgTag).join("");
+}
+
 function optionsHtml(q) {
   if (!q.options || !q.options.length) return "";
   const items = q.options.map((o) => {
@@ -353,10 +359,12 @@ function solutionsHtml() {
     if (n > 0 && n % 20 === 0) html += "<!--CHUNK-->";
     n++;
     var sol = q.detailed_solution || q.explanation_latex || q.explanation || "";
+    var solImgs = explanationImages(q);
     html += '<div class="sol"><div class="sq"><b>' + q.display_number + ".</b> " +
       renderLatex(q.question_latex || q.question_text || "") + "</div>" +
       '<div class="sa"><b>Answer:</b> ' + answerOf(q) + "</div>" +
-      (sol ? '<div class="se">' + renderLatex(sol) + "</div>" : "") + "</div>";
+      (sol ? '<div class="se">' + renderLatex(sol) + "</div>" : "") +
+      (solImgs ? '<div class="se">' + solImgs + "</div>" : "") + "</div>";
   });
   // NOTE: no break-inside:avoid on .sol — a worked solution can be taller than
   // a page, and forcing it unbreakable sends older weasyprint versions into a

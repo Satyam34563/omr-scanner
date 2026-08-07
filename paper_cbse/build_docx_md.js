@@ -73,6 +73,12 @@ function questionImages(q) {
   return (refs || []).map(function (r) { return imgMd(r); }).filter(Boolean).join("\n");
 }
 
+function explanationImages(q) {
+  let refs = q.explanation_images;
+  if (typeof refs === "string") { try { refs = JSON.parse(refs); } catch (e) { refs = []; } }
+  return (refs || []).map(function (r) { return imgMd(r); }).filter(Boolean).join("\n");
+}
+
 function fmtDate(s) {
   if (!s) return "";
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -246,6 +252,8 @@ function solutionsMd() {
     out += "**Answer:** " + answerOf(q) + "\n\n";
     const sol = q.detailed_solution || q.explanation_latex || q.explanation || "";
     if (sol) out += mdText(sol) + "\n\n";
+    const solImgs = explanationImages(q);
+    if (solImgs) out += solImgs + "\n\n";
   });
   return out;
 }

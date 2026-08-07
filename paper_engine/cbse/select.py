@@ -42,7 +42,7 @@ def chapters_for_books(con, book_ids):
 
 
 # --------------------------------------------------------------- candidates
-def _candidates(con, book_ids, types, marks, chapter_ids, difficulties, intact):
+def _candidates(con, book_ids, types, marks, chapter_ids, difficulties, intact, paper_tags=None):
     ph = ",".join("?" for _ in book_ids)
     where = [f"q.chapter_id IN (SELECT id FROM chapters WHERE book_id IN ({ph}))"]
     params = list(book_ids)
@@ -53,8 +53,16 @@ def _candidates(con, book_ids, types, marks, chapter_ids, difficulties, intact):
         where.append("q.chapter_id IN (%s)" % ",".join("?" for _ in chapter_ids)); params += list(chapter_ids)
     if difficulties:
         where.append("q.difficulty IN (%s)" % ",".join("?" for _ in difficulties)); params += list(difficulties)
+    # Never select a soft-deleted / disabled question into a real paper. Any
+    # non-zero value counts as active (forward-compatible with future
+    # 1/2/... schemes) — only 0 is excluded.
+    where.append("q.is_active != 0")
+    if paper_tags:
+        where.append("(%s)" % " OR ".join("q.paper_tags LIKE ?" for _ in paper_tags))
+        params += [f'%"{t}"%' for t in paper_tags]
     if intact:
         where.append("q.context_block_id IS NOT NULL")
+        where.append("q.context_block_id IN (SELECT id FROM context_blocks WHERE is_active != 0)")
     return _db.dicts(
         con,
         f"SELECT q.id, q.question_number, q.chapter_id, q.context_block_id FROM questions q WHERE {' AND '.join(where)}",
@@ -119,6 +127,7 @@ def select_paper(con, cfg, usage_map=None):
 
     class_number = cfg["class_number"]
     difficulties = list(cfg.get("difficulty") or [])
+    paper_tags = list(cfg.get("paper_tags") or [])
 
     # A paper may span ONE or MORE subjects. `subjects` (a list of per-subject
     # configs) each carry their own sections/chapters/target; difficulty + mode
@@ -147,7 +156,7 @@ def select_paper(con, cfg, usage_map=None):
         first_book = first_book or book
         if book.get("subject") and book["subject"] not in subjects_used:
             subjects_used.append(book["subject"])
-        secs, bl, ids, w = _select_for_book(con, book, [b["id"] for b in books], sc, difficulties, usage_map, rng, mode, strategy)
+        secs, bl, ids, w = _select_for_book(con, book, [b["id"] for b in books], sc, difficulties, paper_tags, usage_map, rng, mode, strategy)
         for s in secs:
             s["subject"] = book.get("subject")
         sections_out += secs
@@ -194,7 +203,7 @@ def select_paper(con, cfg, usage_map=None):
     return content, chosen_ids
 
 
-def _select_for_book(con, book, book_ids, sc, difficulties, usage_map, rng, mode, strategy):
+def _select_for_book(con, book, book_ids, sc, difficulties, paper_tags, usage_map, rng, mode, strategy):
     """Run the blueprint selection for ONE subject (possibly several books)."""
     chapter_ids = [int(x) for x in (sc.get("chapters") or [])]
     chmap = {c["id"]: c["name"] for c in chapters_for_books(con, book_ids)}
@@ -226,7 +235,7 @@ def _select_for_book(con, book, book_ids, sc, difficulties, usage_map, rng, mode
                     f"but the section total is {bk['count']} — lower the pins or raise the section count.")
 
     for bk in buckets:
-        rows = _candidates(con, book_ids, bk["types"], bk.get("marks"), chapter_ids, difficulties, bk["intact"])
+        rows = _candidates(con, book_ids, bk["types"], bk.get("marks"), chapter_ids, difficulties, bk["intact"], paper_tags)
         q_ids_ordered = []
 
         if bk["intact"]:
@@ -286,7 +295,7 @@ def _select_for_book(con, book, book_ids, sc, difficulties, usage_map, rng, mode
             for bk, sec in pairs:
                 if need <= 0 or bk["intact"]:
                     continue
-                rows = _candidates(con, book_ids, bk["types"], bk.get("marks"), chapter_ids, difficulties, False)
+                rows = _candidates(con, book_ids, bk["types"], bk.get("marks"), chapter_ids, difficulties, False, paper_tags)
                 have = {q["id"] for q in sec["questions"]}
                 pinned_ch = set(int(c) for c in (bk.get("chapters") or {}))
                 pool = [r for r in rows if r["id"] not in have and r["chapter_id"] not in pinned_ch]
