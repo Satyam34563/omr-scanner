@@ -213,12 +213,12 @@ def _select_for_book(con, book, book_ids, sc, difficulties, paper_tags, usage_ma
     if target_mode in ("marks", "questions"):
         case_qs = _avg_case_questions(con, book_ids) if target_mode == "questions" else 1
         buckets, scale_warn = _scaled_buckets(
-            target_mode, float(sc.get("target_value") or 0),
+            con, book_ids, target_mode, float(sc.get("target_value") or 0),
             sc.get("include_types"), case_qs, sc.get("sections"))
         if scale_warn:
             warnings.append(f"[{book.get('subject','')}] {scale_warn}")
     else:
-        buckets = _bp.resolve_buckets({"sections": sc.get("sections")})
+        buckets = _bp.resolve_buckets(con, book_ids, {"sections": sc.get("sections")})
 
     # STRICT: per-chapter pins may never exceed the section's blueprint count.
     # (Auto-sized sections in target modes are bumped up to their pins instead —
@@ -344,12 +344,12 @@ def _avg_case_questions(con, book_ids):
     return max(1, int(round((row or {}).get("a") or 0)) or 1)
 
 
-def _scaled_buckets(target_mode, target_value, include_types=None, case_qs=1, sections=None):
+def _scaled_buckets(con, book_ids, target_mode, target_value, include_types=None, case_qs=1, sections=None):
     """Plan section counts to hit a target total (marks or printed questions).
 
     Sections the user pinned (an explicit `count` in `sections`) keep that
     count; the REMAINDER of the target is distributed across the untouched
-    sections proportionally to the default blueprint (floor + largest
+    sections proportionally to the discovered buckets (floor + largest
     fractional remainder, only adding units that still fit). Explicit
     per-chapter maps ride along on each bucket. Returns (buckets, warn).
 
@@ -357,7 +357,7 @@ def _scaled_buckets(target_mode, target_value, include_types=None, case_qs=1, se
     target_mode 'questions': a unit weighs 1 printed question — except intact
     case buckets, where one block prints ~case_qs numbered sub-questions.
     """
-    buckets = _bp.default_blueprint()
+    buckets = _bp.discover_buckets(con, book_ids)
     if include_types:
         inc = set(include_types)
         buckets = [b for b in buckets if inc.intersection(b["types"])]
