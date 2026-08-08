@@ -75,7 +75,7 @@ class OmrController extends Controller
         $omrApiUrl = config('services.omr.url');
 
         try {
-            $response = Http::timeout(180) // OMR processing + upload/download time for a big batch
+            $response = Http::timeout(5400) // OMR processing + upload/download time for a big batch
                 ->attach(
                     'scans_pdf',
                     fopen($request->file('scans_pdf')->getRealPath(), 'r'),
@@ -211,7 +211,7 @@ class OmrController extends Controller
         $omrApiUrl = config('services.omr.url');
 
         try {
-            $response = Http::timeout(60)
+            $response = Http::timeout(1200)
                 ->attach('results_xlsx', Storage::get("{$jobDir}/results.xlsx"), 'results.xlsx')
                 ->post("{$omrApiUrl}/resolve", [
                     'corrections' => json_encode($corrections),
